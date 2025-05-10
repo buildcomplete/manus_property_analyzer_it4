@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import './App.css'; // Ensure Tailwind is configured via index.css or similar
 
 // --- Interfaces (Keep or move to types.ts) ---
