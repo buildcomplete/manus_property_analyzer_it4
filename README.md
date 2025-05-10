@@ -1,17 +1,17 @@
-# Property Investment Analysis Tool
+# Property Investment Analysis Tool (v1.4)
 
 ## Overview
 
-This web application provides a comparative financial analysis for property investments in Barcelona, Spain, and Copenhagen, Denmark. It allows users to simulate different scenarios based on property types (including new, resale, renovation-needed, Danish Ejer/Andels, and **properties under construction**), personal financial inputs, and market assumptions.
+This web application provides a flexible financial analysis tool for property investments. It allows users to define and compare multiple investment scenarios across different locations (initially Barcelona, Spain, and Copenhagen, Denmark) and property types.
 
-The tool calculates purchase costs, running costs, selling costs, and potential financial outcomes under various appreciation scenarios (average, low-risk, high-risk, zero growth) over a specified holding period.
+The tool calculates purchase costs, running costs, selling costs, and potential financial outcomes under various appreciation scenarios (average, low-risk, high-risk, zero growth) over a specified holding period, incorporating loan interest costs for a more accurate win/loss assessment.
 
 ## Tech Stack
 
 -   **Backend:** Python (Flask)
 -   **Frontend:** TypeScript (React)
 -   **Containerization:** Docker, Docker Compose
--   **UI Components:** Tailwind CSS, shadcn/ui (planned for full implementation)
+-   **UI Components:** Tailwind CSS (basic implementation)
 
 ## Architecture
 
@@ -22,20 +22,19 @@ The project follows a monorepo structure:
 -   `docker-compose.yml`: Defines and orchestrates the backend and frontend services for local development.
 -   `Dockerfile` (in backend/ and frontend/): Define the container images.
 
-## Features
+## Features (v1.4)
 
--   **Comparison:** Barcelona vs. Copenhagen.
+-   **Multi-Scenario Comparison:** Define and compare multiple investment scenarios side-by-side.
+-   **Flexible Inputs:**
+    -   **Global Settings:** Years to Sell, Display Currency, Personal Finance (optional).
+    -   **Per Scenario:** Country (Spain/Denmark), City (Barcelona/Copenhagen), Property Type, Price, Loan Details, Renovations, Payment Schedules (for under construction), Country-Specific options (Beckham Law, Andelslån).
 -   **Property Types:**
-    -   Spain: New, Renovation Needed, Under Construction
-    -   Denmark: Ejerlejlighed, Andelslejlighed, Under Construction
--   **Cost Calculation:** Purchase (taxes, fees, VAT/ITP), Running (property taxes, community fees), Selling (agency fees, capital gains).
--   **Scenario Analysis:** Average, Low Risk, High Risk, Zero Growth appreciation.
--   **User Inputs:** Property price, type, location, renovation details, personal finance (salary, etc.), holding period.
--   **Specific Logic:**
-    -   Handles Spanish Beckham Law (basic tax rate application).
-    -   Handles Danish Andels lån (loan type option).
-    -   Handles Under Construction properties (VAT, payment schedules - initial outlay calculation, timeline adjustments).
--   **Customization:** Adjustable default rates (planned), multiple renovation options.
+    -   Spain: New Build, Second Hand, Under Construction
+    -   Denmark: Ejerlejlighed, Andelslejlighed, New Build, Under Construction
+-   **Cost Calculation:** Purchase (taxes, fees, VAT/ITP), Running (property taxes, community fees), Selling (agency fees, capital gains), Loan Interest (total paid over holding period).
+-   **Scenario Analysis:** Average, Low Risk, High Risk, Zero Growth appreciation outcomes calculated for each defined scenario.
+-   **User Interface:** Tabbed interface for managing multiple scenarios, grouped input sections, basic results display showing key metrics per scenario.
+-   **Educational Tests:** Backend unit tests (`pytest`) with explanations of financial concepts.
 
 ## Setup and Running (Local Development)
 
@@ -46,32 +45,35 @@ The project follows a monorepo structure:
 
 **Steps:**
 
-1.  **Clone the repository (or ensure files are in the correct structure).**
-2.  **Navigate to the project root directory (`/home/ubuntu/property_analyzer`).**
+1.  **Extract the archive (`property_analyzer_v1.4.tar.gz`).**
+2.  **Navigate to the project root directory (`property_analyzer`).**
 3.  **Build and start the services:**
     ```bash
     docker-compose up --build -d
     ```
+    *Note: The initial build might take a few minutes, especially for the frontend dependencies.*
 4.  **Access the application:**
-    -   Frontend: `http://localhost:3000` (or the mapped port)
-    -   Backend API: `http://localhost:5000` (or the mapped port)
+    -   Frontend: `http://localhost:3000`
+    -   Backend API: `http://localhost:5000`
 
 ## Development Notes
 
 -   **Backend:**
     -   Activate virtual environment: `source backend/venv/bin/activate`
     -   Install dependencies: `pip install -r backend/requirements.txt`
+    -   Run tests: `pytest` (within venv)
     -   Run development server: `flask run --host=0.0.0.0` (within venv)
 -   **Frontend:**
     -   Navigate to `frontend/`
-    -   Install dependencies: `npm install` (or `pnpm install` if using pnpm)
-    -   Run development server: `npm run dev` (or `pnpm dev`)
+    -   Install dependencies: `npm install`
+    -   Run development server: `npm run dev`
 
-## Current Status & Limitations (as of v1.1)
+## Current Status & Limitations (as of v1.4)
 
--   Backend logic implemented for core comparison and under-construction scenarios (VAT, timeline, basic payment schedule impact).
--   Frontend structure implemented with basic inputs and results display, including conditional fields for under-construction.
--   **Pending Full Frontend Implementation:** Detailed UI styling (branding, high contrast, etc.), advanced input components (payment schedule table, renovation list), sophisticated results visualization (charts, side-by-side cards).
--   **Backend Assumptions/Placeholders:** Calculations rely on proxy values for certain taxes (IBI, Danish property taxes) and simplified logic for others (Plusvalia, capital gains basis/rules, Beckham law impact, DK tax rules). These are noted as warnings in the API response.
--   Optional bonus tools (Loan Repayment, Rental Yield) are not yet implemented.
+-   Core backend and frontend logic for multi-scenario comparison is implemented and functional.
+-   UI provides basic input fields, tabs, and results display (key metrics + raw JSON).
+-   **Pending/Future Enhancements:**
+    -   **Advanced Frontend:** UI refinement (e.g., using shadcn/ui components, high-contrast options), sophisticated results visualization (e.g., charts, formatted breakdown tables instead of raw JSON - CR1.4).
+    -   **Backend Assumptions:** Calculations still rely on some proxy values (e.g., cadastral value for IBI) and simplified logic for complex taxes (Plusvalia, detailed capital gains rules). These are noted as warnings.
+    -   **Bonus Tools:** Loan Repayment Schedule and Rental Yield Calculator are not implemented.
 

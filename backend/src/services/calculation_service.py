@@ -77,6 +77,7 @@ def get_rate(country, city, key, subkey=None):
         else:
             value = data[key]
         
+        # Return copies for mutable types to avoid accidental modification
         if isinstance(value, list):
             return list(value)
         elif isinstance(value, dict):
@@ -191,7 +192,7 @@ def calculate_purchase_costs(inputs, country, city):
             ajd_tax = price * get_rate(country, city, "purchase_tax_ajd_construction")
             costs["breakdown"]["purchase_tax_ajd"] = ajd_tax
             ajd_tax_total += ajd_tax
-        elif prop_type == "renovation_needed":
+        elif prop_type == "second_hand": # Changed from renovation_needed
             purchase_tax_itp = price * get_rate(country, city, "purchase_tax_itp_resale")
             costs["breakdown"]["purchase_tax_itp"] = purchase_tax_itp
             purchase_tax_total += purchase_tax_itp
@@ -231,9 +232,10 @@ def calculate_purchase_costs(inputs, country, city):
     costs["breakdown"]["taxes_fees_year0"] = (purchase_tax_total + ajd_tax_total + notary_fee_total + 
                                                registry_fee_total + loan_stamp_duty_total + lawyer_fee_total)
 
+    # Renovations are always possible, not just for second_hand (CR1.1)
     renovation_total = 0
-    if prop_type == "renovation_needed":
-        renovations = inputs.get("renovations", [])
+    renovations = inputs.get("renovations", [])
+    if renovations: # Only calculate if renovations are provided
         renovation_rates = get_rate(country, city, "renovation_rates")
         for reno in renovations:
             cost = reno.get("adjusted_cost")
@@ -244,7 +246,7 @@ def calculate_purchase_costs(inputs, country, city):
             costs["breakdown"][f"renovation_{reno.get('type', 'custom')}"] = cost
         costs["breakdown"]["renovation_total"] = renovation_total
         costs["total_investment_cost"] += renovation_total
-        costs["initial_outlay_year0"] += renovation_total
+        costs["initial_outlay_year0"] += renovation_total # Assume renovations happen at year 0
 
     if prop_type == "under_construction" and payment_schedule:
         costs["breakdown"]["payment_schedule"] = payment_schedule
@@ -308,169 +310,141 @@ def calculate_selling_costs(country, city, selling_price, purchase_price, purcha
     capital_gains_tax = 0
     if capital_gain_base > 0:
         if country == "spain":
-            plusvalia = get_rate(country, city, "selling_plusvalia_municipal") 
+            plusvalia = get_rate(country, city, "selling_plusvalia_municipal") # Placeholder
             costs["breakdown"]["selling_plusvalia_municipal"] = plusvalia
             costs["total"] += plusvalia
-            rates_table = get_rate(country, city, "capital_gains_tax_rate_spain")
-            capital_gains_tax = calculate_progressive_tax(capital_gain_base, rates_table)
-            costs["breakdown"]["capital_gains_tax"] = capital_gains_tax
+            
+            if beckham_law_active:
+                # Beckham law might have specific rules for capital gains - assuming standard rates for now
+                cg_tax_rates = get_rate(country, city, "capital_gains_tax_rate_spain")
+                capital_gains_tax = calculate_progressive_tax(capital_gain_base, cg_tax_rates)
+            else:
+                cg_tax_rates = get_rate(country, city, "capital_gains_tax_rate_spain")
+                capital_gains_tax = calculate_progressive_tax(capital_gain_base, cg_tax_rates)
+            costs["breakdown"]["capital_gains_tax_spain"] = capital_gains_tax
             costs["total"] += capital_gains_tax
+            
         elif country == "denmark":
-            capital_gains_tax = capital_gain_base * get_rate(country, city, "capital_gains_tax_rate_denmark")
-            costs["breakdown"]["capital_gains_tax"] = capital_gains_tax
+            # Capital gains tax rules in DK are complex, often 0 for primary residence
+            # Assuming 0 for now, needs refinement based on user status/property use
+            capital_gains_tax = 0 # Placeholder
+            costs["breakdown"]["capital_gains_tax_denmark"] = capital_gains_tax
             costs["total"] += capital_gains_tax
+
     return costs
 
-def calculate_scenario_results(inputs, purchase_costs, running_costs, years_to_sell, country, city, avg_appreciation, std_dev_appreciation, beckham_law_active):
-    """Calculates results for different appreciation scenarios, INCLUDING LOAN INTEREST."""
+def calculate_scenario_results(purchase_costs, running_costs, selling_costs, total_interest_paid, inputs, country, city, years):
+    """Calculates the final win/loss for different appreciation scenarios."""
     results = {}
     purchase_price = inputs.get("new_flat_price", 0)
     prop_type = inputs.get("property_type", "new")
     completion_years = inputs.get("construction_completion_years", 0) if prop_type == "under_construction" else 0
-    loan_details = inputs.get("loan_details", {})
-    loan_amount = loan_details.get("amount", 0)
-    loan_rate = loan_details.get("interest_rate", 0)
-    loan_term = loan_details.get("term_years", 0)
+    effective_years = max(0, years - completion_years)
+    if purchase_price <= 0: return results
+
+    avg_rate = get_rate(country, city, "avg_appreciation_rate")
+    std_dev = get_rate(country, city, "appreciation_std_dev")
     
-    # Calculate total interest paid over the holding period
-    # Interest accrues from the start, even during construction, if loan is taken out then.
-    # Assuming loan starts at purchase (Year 0) for simplicity now.
-    # TODO: Refine if loan drawdown matches payment schedule for under construction.
-    total_interest_paid = calculate_total_interest_paid(loan_amount, loan_rate, loan_term, years_to_sell)
-    
-    effective_years_appreciation = years_to_sell 
     scenarios = {
-        "avg": avg_appreciation,
-        "low_risk": max(0, avg_appreciation - std_dev_appreciation),
-        "high_risk": avg_appreciation + std_dev_appreciation,
-        "zero_growth": 0
+        "average": avg_rate,
+        "low_risk": avg_rate - std_dev,
+        "high_risk": avg_rate + std_dev,
+        "zero_growth": 0.0
     }
 
+    total_investment = purchase_costs["total_investment_cost"]
+    total_running = running_costs["total"]
+    
     for scenario_name, rate in scenarios.items():
-        selling_price = calculate_future_value(purchase_price, rate, effective_years_appreciation)
-        effective_years_held_tax = max(0, years_to_sell - completion_years)
-        selling_costs = calculate_selling_costs(country, city, selling_price, purchase_price, purchase_costs["total_investment_cost"], effective_years_held_tax, beckham_law_active)
+        selling_price = calculate_future_value(purchase_price, rate, effective_years)
         
-        # Win/Loss = Selling Price - Total Investment Cost - Total Running Costs - Total Interest Paid - Total Selling Costs
-        win_loss = selling_price - purchase_costs["total_investment_cost"] - running_costs["total"] - total_interest_paid - selling_costs["total"]
+        # Recalculate selling costs based on the scenario's selling price
+        beckham_active = inputs.get("personal_finance", {}).get("beckham_law_active", False)
+        scenario_selling_costs = calculate_selling_costs(country, city, selling_price, purchase_price, total_investment, years, beckham_active)
+        total_selling = scenario_selling_costs["total"]
+        
+        # Calculate Win/Loss including loan interest
+        win_loss = selling_price - total_investment - total_running - total_selling - total_interest_paid
         
         results[scenario_name] = {
-            "estimated_selling_price": selling_price,
-            "selling_costs": selling_costs,
-            "total_interest_paid_over_holding": total_interest_paid, # Add interest to results
-            "win_loss": win_loss
+            "selling_price": selling_price,
+            "total_investment_cost": total_investment,
+            "total_running_costs": total_running,
+            "total_loan_interest_paid": total_interest_paid,
+            "total_selling_costs": total_selling,
+            "win_loss": win_loss,
+            "selling_costs_breakdown": scenario_selling_costs["breakdown"]
         }
+        
     return results
 
-# --- Main Calculation Function --- 
+# --- Main Entry Point --- 
 
-def perform_calculation(data):
-    """Main function to orchestrate the investment calculation."""
-    results = {
-        "summary": {},
-        "comparison_results": {},
-        "calculation_details": {"assumptions": [], "warnings": []}
-    }
+def perform_calculation_for_scenario(data):
+    """Performs the full calculation for a single investment scenario."""
     
+    # Extract data for the specific scenario
     personal_finance = data.get("personal_finance", {})
     scenario_settings = data.get("scenario_settings", {})
-    spain_inputs = data.get("spain_inputs", {})
-    denmark_inputs = data.get("denmark_inputs", {})
+    country = data.get("country")
+    city = data.get("city")
+    inputs = data.get("inputs")
+    
+    if not all([country, city, inputs, scenario_settings]):
+        return {"error": "Missing country, city, inputs, or scenario_settings"}
+
     years_to_sell = scenario_settings.get("years_to_sell", 10)
+    
+    # 1. Calculate Purchase Costs
+    purchase_costs_result = calculate_purchase_costs(inputs, country, city)
+    
+    # 2. Calculate Running Costs (excluding interest)
+    running_costs_result = calculate_running_costs(inputs, country, city, years_to_sell)
+    
+    # 3. Calculate Total Loan Interest Paid
+    loan_details = inputs.get("loan_details", {})
+    loan_amount = loan_details.get("amount", inputs.get("new_flat_price", 0) * 0.8)
+    loan_rate = loan_details.get("interest_rate", 0.03) # Example default
+    loan_term = loan_details.get("term_years", 30) # Example default
+    total_interest_paid = calculate_total_interest_paid(loan_amount, loan_rate, loan_term, years_to_sell)
 
-    # Add warnings if loan details are missing for interest calculation
-    def check_loan_details(inputs, country_name):
-        if inputs and inputs.get("loan_details"):
-            details = inputs["loan_details"]
-            if not all(k in details for k in ["amount", "interest_rate", "term_years"]):
-                results["calculation_details"]["warnings"].append(f"{country_name}: Incomplete loan details (amount, interest_rate, term_years required) for accurate interest calculation. Interest cost may be zero.")
-        elif inputs: # Inputs exist but no loan details
-             results["calculation_details"]["warnings"].append(f"{country_name}: Loan details missing. Interest cost not included in win/loss.")
+    # 4. Calculate Scenario Results (Win/Loss for Avg, Low, High, Zero)
+    # Note: Selling costs are calculated *within* calculate_scenario_results for each appreciation scenario
+    scenario_results = calculate_scenario_results(
+        purchase_costs_result,
+        running_costs_result,
+        {}, # Pass empty dict, selling costs calculated inside
+        total_interest_paid,
+        inputs,
+        country,
+        city,
+        years_to_sell
+    )
 
-    check_loan_details(spain_inputs, "Spain")
-    check_loan_details(denmark_inputs, "Denmark")
+    # 5. Consolidate Results
+    final_result = {
+        "inputs_summary": {
+            "country": country,
+            "city": city,
+            "property_type": inputs.get("property_type"),
+            "price": inputs.get("new_flat_price"),
+            "years_held": years_to_sell,
+            "loan_amount": loan_amount,
+            "loan_rate": loan_rate,
+            "loan_term": loan_term,
+        },
+        "purchase_costs": purchase_costs_result,
+        "running_costs": running_costs_result,
+        "total_loan_interest_paid_over_hold": total_interest_paid,
+        "scenario_outcomes": scenario_results,
+        "calculation_details": {
+            "warnings": list(purchase_costs_result["breakdown"].get("warnings", [])) # Collect warnings
+        }
+    }
+    
+    # Clean up warnings if present
+    if "warning_no_payment_schedule" in final_result["purchase_costs"]["breakdown"]:
+        final_result["calculation_details"]["warnings"].append(final_result["purchase_costs"]["breakdown"].pop("warning_no_payment_schedule"))
 
-    # --- Spain Calculation ---
-    if spain_inputs:
-        city_spain = spain_inputs.get("city", "barcelona").lower()
-        purchase_price_spain = spain_inputs.get("new_flat_price")
-        if purchase_price_spain:
-            purchase_costs_spain = calculate_purchase_costs(spain_inputs, "spain", city_spain)
-            running_costs_spain = calculate_running_costs(spain_inputs, "spain", city_spain, years_to_sell)
-            avg_appreciation_spain = get_rate("spain", city_spain, "avg_appreciation_rate")
-            std_dev_appreciation_spain = get_rate("spain", city_spain, "appreciation_std_dev")
-            beckham_law_active_spain = spain_inputs.get("beckham_law_active", False)
-            
-            scenario_results_spain = calculate_scenario_results(
-                spain_inputs, purchase_costs_spain, running_costs_spain, years_to_sell,
-                "spain", city_spain, avg_appreciation_spain, std_dev_appreciation_spain, beckham_law_active_spain
-            )
-            
-            results["comparison_results"]["spain"] = {
-                "purchase_costs": purchase_costs_spain,
-                "running_costs": running_costs_spain,
-                "scenarios": scenario_results_spain,
-                "detailed_breakdown": {
-                    **purchase_costs_spain["breakdown"],
-                    **running_costs_spain["breakdown_total"],
-                    "total_interest_paid_avg_scenario": scenario_results_spain.get("avg", {}).get("total_interest_paid_over_holding", 0),
-                    **scenario_results_spain.get("avg", {}).get("selling_costs", {}).get("breakdown", {})
-                }
-            }
-            prop_type_spain = spain_inputs.get("property_type", "N/A").replace("_", " ").capitalize()
-            results["summary"]["spain_scenario"] = f"{city_spain.capitalize()} - {prop_type_spain}"
-            results["calculation_details"]["warnings"].append("Spain running costs use proxy values for IBI calculation.")
-            results["calculation_details"]["warnings"].append("Spain selling costs use placeholder for Plusvalia and simplified capital gains basis.")
-            if spain_inputs.get("property_type") == "under_construction":
-                 results["calculation_details"]["warnings"].append("Spain under construction logic uses simplified payment schedule impact and assumes loan starts at purchase.")
-                 if "warning_no_payment_schedule" in purchase_costs_spain.get("breakdown",{}): results["calculation_details"]["warnings"].append("Spain: No payment schedule provided for under construction, assumed 10% initial.")
-        else:
-             results["comparison_results"]["spain"] = {"error": "Missing purchase price for Spain."}
-
-    # --- Denmark Calculation ---
-    if denmark_inputs:
-        city_denmark = denmark_inputs.get("city", "copenhagen").lower()
-        purchase_price_denmark = denmark_inputs.get("new_flat_price")
-        if purchase_price_denmark:
-            purchase_costs_denmark = calculate_purchase_costs(denmark_inputs, "denmark", city_denmark)
-            running_costs_denmark = calculate_running_costs(denmark_inputs, "denmark", city_denmark, years_to_sell)
-            avg_appreciation_denmark = get_rate("denmark", city_denmark, "avg_appreciation_rate")
-            std_dev_appreciation_denmark = get_rate("denmark", city_denmark, "appreciation_std_dev")
-
-            scenario_results_denmark = calculate_scenario_results(
-                denmark_inputs, purchase_costs_denmark, running_costs_denmark, years_to_sell,
-                "denmark", city_denmark, avg_appreciation_denmark, std_dev_appreciation_denmark, False
-            )
-
-            results["comparison_results"]["denmark"] = {
-                "purchase_costs": purchase_costs_denmark,
-                "running_costs": running_costs_denmark,
-                "scenarios": scenario_results_denmark,
-                "detailed_breakdown": {
-                    **purchase_costs_denmark["breakdown"],
-                    **running_costs_denmark["breakdown_total"],
-                    "total_interest_paid_avg_scenario": scenario_results_denmark.get("avg", {}).get("total_interest_paid_over_holding", 0),
-                    **scenario_results_denmark.get("avg", {}).get("selling_costs", {}).get("breakdown", {})
-                }
-            }
-            prop_type_dk = denmark_inputs.get("property_type", "N/A")
-            if prop_type_dk == "ejer": prop_type_dk_display = "Ejerlejlighed"
-            elif prop_type_dk == "andels": prop_type_dk_display = "Andelslejlighed"
-            elif prop_type_dk == "under_construction": prop_type_dk_display = "Under Construction"
-            else: prop_type_dk_display = "N/A"
-            results["summary"]["denmark_scenario"] = f"{city_denmark.capitalize()} - {prop_type_dk_display}"
-            results["calculation_details"]["warnings"].append("Denmark running costs use proxy values for tax calculations.")
-            results["calculation_details"]["warnings"].append("Denmark selling costs use simplified capital gains (may be exempt for primary residence - check needed).")
-            results["calculation_details"]["warnings"].append("Denmark VAT/Tinglysning rules for new builds need verification.")
-            if denmark_inputs.get("property_type") == "under_construction":
-                 results["calculation_details"]["warnings"].append("Denmark under construction logic uses simplified payment schedule impact and assumes loan starts at purchase.")
-                 if "warning_no_payment_schedule" in purchase_costs_denmark.get("breakdown",{}): results["calculation_details"]["warnings"].append("Denmark: No payment schedule provided for under construction, assumed 10% initial.")
-        else:
-            results["comparison_results"]["denmark"] = {"error": "Missing purchase price for Denmark."}
-
-    # --- Final Summary ---
-    results["summary"]["executive_summary"] = "Comparison results generated including estimated loan interest costs. Review scenarios and detailed breakdowns. Note warnings regarding assumptions."
-    results["calculation_details"]["message"] = "Core calculation logic updated to include estimated total loan interest paid over holding period in win/loss calculation."
-
-    return results
+    return final_result
 

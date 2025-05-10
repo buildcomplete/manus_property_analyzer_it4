@@ -8,13 +8,17 @@ interface PaymentScheduleItem {
   due_year: number;
 }
 
+// Interface for frontend state management (includes client-side ID)
 interface RenovationItem {
-  id: string; // Add unique ID for list management
+  id: string; // Unique ID for list management in UI
   type: string;
   description?: string;
   default_cost?: number; // Not used in input, maybe for display?
   adjusted_cost?: number;
 }
+
+// Interface for the renovation data sent to the backend (excludes client-side ID)
+type RenovationPayloadItem = Omit<RenovationItem, 'id'>;
 
 interface LoanDetails {
   amount?: number;
@@ -22,11 +26,13 @@ interface LoanDetails {
   term_years?: number;
 }
 
-interface CountryInputs {
-  city: string;
-  property_type: 'new' | 'renovation_needed' | 'under_construction' | 'ejer' | 'andels';
+// Interface for scenario-specific inputs SENT TO BACKEND
+interface ScenarioInputsPayload {
+  country: 'spain' | 'denmark';
+  city: string; // e.g., 'barcelona', 'copenhagen'
+  property_type: 'new' | 'second_hand' | 'under_construction' | 'ejer' | 'andels'; // 'second_hand' replaces 'renovation_needed'
   new_flat_price?: number;
-  renovations: RenovationItem[];
+  renovations: RenovationPayloadItem[]; // Renovations always possible
   loan_details?: LoanDetails;
   // Spain specific
   beckham_law_active?: boolean;
@@ -36,6 +42,14 @@ interface CountryInputs {
   // Under Construction specific
   construction_completion_years?: number;
   payment_schedule?: PaymentScheduleItem[];
+}
+
+// Interface for scenario-specific inputs used in FRONTEND STATE
+// Extends the payload but uses the RenovationItem with ID for state management
+interface ScenarioInputsState extends Omit<ScenarioInputsPayload, 'renovations'> {
+    id: string; // Unique ID for the scenario itself
+    name: string; // User-editable name for the scenario tab
+    renovations: RenovationItem[];
 }
 
 interface PersonalFinanceInputs {
@@ -50,64 +64,42 @@ interface ScenarioSettingsInputs {
   currency: 'EUR' | 'DKK';
 }
 
+// Interface for the main request SENT TO BACKEND
 interface CalculationRequest {
   personal_finance: PersonalFinanceInputs;
   scenario_settings: ScenarioSettingsInputs;
-  spain_inputs?: Partial<CountryInputs>;
-  denmark_inputs?: Partial<CountryInputs>;
+  scenarios: ScenarioInputsPayload[]; // List of scenarios
 }
 
-// --- Result Interfaces (More Specific) ---
-interface ScenarioResult {
-    estimated_selling_price: number;
-    total_investment_cost: number;
-    total_running_costs: number;
-    total_selling_costs: number;
-    total_loan_interest_paid: number;
-    net_win_loss: number;
-    initial_outlay_year0: number;
-    // Add more fields as needed from backend response
+// --- Result Interfaces (Adjusted for Multi-Scenario) ---
+interface SingleScenarioResult {
+    // Corresponds to the output of perform_calculation_for_scenario
+    inputs_summary: Record<string, any>;
+    purchase_costs: { total_investment_cost: number; initial_outlay_year0: number; breakdown: Record<string, any> };
+    running_costs: { total: number; breakdown_annual: Record<string, any>; breakdown_total: Record<string, any> };
+    total_loan_interest_paid_over_hold: number;
+    scenario_outcomes: {
+        average: { selling_price: number; win_loss: number; [key: string]: any };
+        low_risk: { selling_price: number; win_loss: number; [key: string]: any };
+        high_risk: { selling_price: number; win_loss: number; [key: string]: any };
+        zero_growth: { selling_price: number; win_loss: number; [key: string]: any };
+    };
+    calculation_details?: {
+        warnings?: string[];
+    };
+    error?: string;
 }
 
-interface CountryResult {
-    avg_case: ScenarioResult;
-    low_growth_case: ScenarioResult;
-    high_growth_case: ScenarioResult;
-    zero_growth_case: ScenarioResult;
-    purchase_costs: { total: number; breakdown: Record<string, number> };
-    running_costs_annual: { total: number; breakdown: Record<string, number> };
-    selling_costs: { total: number; breakdown: Record<string, number> };
-    // Add more detailed fields
-}
-
-interface ComparisonResults {
-    spain?: CountryResult;
-    denmark?: CountryResult;
-}
-
-interface CalculationResult {
-  summary?: {
-    spain_scenario?: string;
-    denmark_scenario?: string;
-    executive_summary?: string;
-  };
-  comparison_results?: ComparisonResults;
-  calculation_details?: {
-    assumptions?: string[];
-    warnings?: string[];
-    message?: string;
-  };
-  error?: string;
-}
+// The backend now returns a list of results, one per input scenario
+type CalculationResponse = SingleScenarioResult[];
 
 // --- Helper Components (Placeholder - Implement with shadcn/ui later) ---
 
-const InputField = ({ label, type = 'number', value, onChange, placeholder, tooltip, step }: any) => (
+const InputField = ({ label, type = 'number', value, onChange, placeholder, tooltip, step, disabled = false }: any) => (
   <div className="mb-4">
     <label className="block text-sm font-medium text-gray-700 mb-1">
       {label}
       {tooltip && (
-        // Using simple title attribute for tooltip for now
         <span className="ml-1 text-gray-400 cursor-help" title={tooltip}>ⓘ</span>
       )}
     </label>
@@ -117,12 +109,13 @@ const InputField = ({ label, type = 'number', value, onChange, placeholder, tool
       onChange={onChange}
       placeholder={placeholder}
       step={step}
-      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+      disabled={disabled}
+      className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
     />
   </div>
 );
 
-const SelectField = ({ label, value, onChange, options, tooltip }: any) => (
+const SelectField = ({ label, value, onChange, options, tooltip, disabled = false }: any) => (
   <div className="mb-4">
     <label className="block text-sm font-medium text-gray-700 mb-1">
       {label}
@@ -133,24 +126,26 @@ const SelectField = ({ label, value, onChange, options, tooltip }: any) => (
     <select
       value={value}
       onChange={onChange}
-      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+      disabled={disabled}
+      className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
     >
       {options.map((opt: any) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
     </select>
   </div>
 );
 
-const CheckboxField = ({ label, checked, onChange, tooltip }: any) => (
+const CheckboxField = ({ label, checked, onChange, tooltip, disabled = false }: any) => (
     <div className="flex items-center mb-4">
         <input
             id={label.replace(/\s+/g, '-')}
             type="checkbox"
             checked={checked}
             onChange={onChange}
-            className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+            disabled={disabled}
+            className={`h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 ${disabled ? 'cursor-not-allowed' : ''}`}
         />
         <label htmlFor={label.replace(/\s+/g, '-')}
-               className="ml-2 block text-sm text-gray-900">
+               className={`ml-2 block text-sm ${disabled ? 'text-gray-500' : 'text-gray-900'}`}>
             {label}
             {tooltip && (
                 <span className="ml-1 text-gray-400 cursor-help" title={tooltip}>ⓘ</span>
@@ -213,9 +208,8 @@ const RenovationInput = ({ renovations, onChange, currency }: { renovations: Ren
     );
 };
 
-// --- Payment Schedule Input Component (Placeholder) ---
+// --- Payment Schedule Input Component ---
 const PaymentScheduleInput = ({ schedule, onChange }: { schedule: PaymentScheduleItem[] | undefined, onChange: (schedule: PaymentScheduleItem[]) => void }) => {
-    // Basic placeholder - needs proper implementation with add/remove/edit
     const addPayment = () => {
         const currentSchedule = schedule || [];
         onChange([...currentSchedule, { percentage: 0, due_year: 0 }]);
@@ -230,6 +224,9 @@ const PaymentScheduleInput = ({ schedule, onChange }: { schedule: PaymentSchedul
         const currentSchedule = schedule || [];
         onChange(currentSchedule.filter((_, i) => i !== index));
     };
+
+    // Calculate total percentage
+    const totalPercentage = (schedule || []).reduce((sum, p) => sum + (p.percentage || 0), 0);
 
     return (
         <div className="mb-4 p-3 border rounded-md bg-gray-50">
@@ -263,77 +260,258 @@ const PaymentScheduleInput = ({ schedule, onChange }: { schedule: PaymentSchedul
                 +
                 Add Payment Stage
             </button>
+            <p className={`text-xs mt-2 ${Math.abs(totalPercentage - 1.0) > 0.001 ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
+                Total Percentage: {(totalPercentage * 100).toFixed(1)}%
+            </p>
+        </div>
+    );
+};
+
+// --- Scenario Input Component ---
+const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: ScenarioInputsState, onChange: (updatedScenario: ScenarioInputsState) => void, onRemove: () => void, currency: string }) => {
+
+    const handleInputChange = (field: keyof ScenarioInputsPayload, value: any) => {
+        onChange({ ...scenario, [field]: value });
+    };
+
+    const handleNestedChange = (section: 'loan_details', field: keyof LoanDetails, value: any) => {
+        onChange({ ...scenario, [section]: { ...scenario[section], [field]: value } });
+    };
+
+    const handleRenovationChange = (renos: RenovationItem[]) => {
+        onChange({ ...scenario, renovations: renos });
+    };
+
+    const handlePaymentScheduleChange = (schedule: PaymentScheduleItem[]) => {
+        onChange({ ...scenario, payment_schedule: schedule });
+    };
+
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange({ ...scenario, name: e.target.value });
+    };
+
+    const countryOptions = [
+        { value: 'spain', label: 'Spain' },
+        { value: 'denmark', label: 'Denmark' },
+    ];
+
+    const cityOptions = scenario.country === 'spain' ? [{ value: 'barcelona', label: 'Barcelona' }] : [{ value: 'copenhagen', label: 'Copenhagen' }];
+
+    const propertyTypeOptions = scenario.country === 'spain' ? [
+        { value: 'new', label: 'New Build' },
+        { value: 'second_hand', label: 'Second Hand' }, // Renamed
+        { value: 'under_construction', label: 'Under Construction' },
+    ] : [
+        { value: 'ejer', label: 'Ejerlejlighed (Owner Flat)' },
+        { value: 'andels', label: 'Andelslejlighed (Cooperative Flat)' },
+        { value: 'new', label: 'New Build' }, // New build possible in DK too
+        { value: 'under_construction', label: 'Under Construction' },
+    ];
+
+    const loanTypeOptions = [
+        { value: 'standard', label: 'Standard Mortgage' },
+        { value: 'andels_laan', label: 'Andelslån (Cooperative Loan)' },
+    ];
+
+    return (
+        <div className="p-4 border border-gray-200 rounded-lg mb-4 bg-white shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+                <input
+                    type="text"
+                    value={scenario.name}
+                    onChange={handleNameChange}
+                    className="text-lg font-semibold border-b-2 border-transparent focus:border-indigo-500 outline-none"
+                />
+                <button onClick={onRemove} className="text-sm text-red-600 hover:text-red-800">Remove Scenario</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                {/* Column 1 */}
+                <div>
+                    <SelectField
+                        label="Country"
+                        value={scenario.country}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                            const newCountry = e.target.value as 'spain' | 'denmark';
+                            // Reset city and potentially type when country changes
+                            const newCity = newCountry === 'spain' ? 'barcelona' : 'copenhagen';
+                            const newType = newCountry === 'spain' ? 'new' : 'ejer';
+                            onChange({ ...scenario, country: newCountry, city: newCity, property_type: newType });
+                        }}
+                        options={countryOptions}
+                        tooltip="Select the country for this scenario."
+                    />
+                    <SelectField
+                        label="City"
+                        value={scenario.city}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('city', e.target.value)}
+                        options={cityOptions}
+                        disabled={true} // Only one city per country for now
+                        tooltip="City within the selected country (currently fixed)."
+                    />
+                    <SelectField
+                        label="Property Type"
+                        value={scenario.property_type}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('property_type', e.target.value)}
+                        options={propertyTypeOptions}
+                        tooltip="Type of property being considered."
+                    />
+                    <InputField
+                        label="Property Price"
+                        value={scenario.new_flat_price}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('new_flat_price', parseInt(e.target.value, 10) || undefined)}
+                        placeholder={`Enter price in ${currency}`}
+                        tooltip={`Purchase price of the property in ${currency}.`}
+                    />
+
+                    {/* Conditional: Under Construction */}
+                    {scenario.property_type === 'under_construction' && (
+                        <>
+                            <InputField
+                                label="Completion (Years from now)"
+                                value={scenario.construction_completion_years}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('construction_completion_years', parseInt(e.target.value, 10) || undefined)}
+                                placeholder="e.g., 2"
+                                tooltip="Estimated number of years until construction is complete and property is usable."
+                            />
+                            <PaymentScheduleInput
+                                schedule={scenario.payment_schedule}
+                                onChange={handlePaymentScheduleChange}
+                            />
+                        </>
+                    )}
+                </div>
+
+                {/* Column 2 */}
+                <div>
+                    <h4 className="font-medium mb-2 text-md">Loan Details (Optional)</h4>
+                    <InputField
+                        label="Loan Amount"
+                        value={scenario.loan_details?.amount}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'amount', parseInt(e.target.value, 10) || undefined)}
+                        placeholder={`Defaults to 80% of price`}
+                        tooltip={`Amount borrowed in ${currency}. Leave blank to use 80% LTV.`}
+                    />
+                    <InputField
+                        label="Interest Rate (% p.a.)"
+                        value={scenario.loan_details?.interest_rate !== undefined ? scenario.loan_details.interest_rate * 100 : ''}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'interest_rate', parseFloat(e.target.value) / 100 || undefined)}
+                        placeholder="e.g., 3.5"
+                        step="0.01"
+                        tooltip="Annual interest rate for the loan (e.g., 3.5 for 3.5%)."
+                    />
+                    <InputField
+                        label="Loan Term (Years)"
+                        value={scenario.loan_details?.term_years}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'term_years', parseInt(e.target.value, 10) || undefined)}
+                        placeholder="e.g., 30"
+                        tooltip="Total duration of the loan in years."
+                    />
+
+                    {/* Conditional: Denmark */}
+                    {scenario.country === 'denmark' && (
+                        <SelectField
+                            label="Loan Type (Denmark)"
+                            value={scenario.loan_type || 'standard'}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('loan_type', e.target.value)}
+                            options={loanTypeOptions}
+                            disabled={scenario.property_type !== 'andels'} // Only relevant for Andels
+                            tooltip="Specific loan type, relevant for Andelslejlighed."
+                        />
+                    )}
+
+                    {/* Conditional: Spain */}
+                    {scenario.country === 'spain' && (
+                        <>
+                            <CheckboxField
+                                label="Beckham Law Active?"
+                                checked={scenario.beckham_law_active || false}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('beckham_law_active', e.target.checked)}
+                                tooltip="Check if the special Beckham Law tax regime applies."
+                            />
+                            <InputField
+                                label="Beckham Law Remaining Years"
+                                value={scenario.beckham_law_remaining_years}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('beckham_law_remaining_years', parseInt(e.target.value, 10) || undefined)}
+                                placeholder="e.g., 4"
+                                disabled={!scenario.beckham_law_active}
+                                tooltip="Number of years remaining under the Beckham Law regime."
+                            />
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Renovations - Always visible (CR1.1) */}
+            <RenovationInput
+                renovations={scenario.renovations}
+                onChange={handleRenovationChange}
+                currency={currency}
+            />
         </div>
     );
 };
 
 
-// --- Results Display Component ---
-const ResultsDisplay = ({ result, currency }: { result: CalculationResult, currency: string }) => {
+// --- Results Display Component (Adjusted for Multi-Scenario) ---
+const ResultsDisplay = ({ results, currency }: { results: CalculationResponse | null, currency: string }) => {
     const formatCurrency = (value: number | undefined) => {
         if (value === undefined || value === null) return '-';
         return new Intl.NumberFormat(currency === 'EUR' ? 'de-DE' : 'da-DK', { style: 'currency', currency: currency, maximumFractionDigits: 0 }).format(value);
     };
 
-    const renderCountryResults = (countryData: CountryResult | undefined, countryName: string) => {
-        if (!countryData) return <p className="text-gray-500 italic">No data entered for {countryName}.</p>;
+    if (!results) {
+        return null; // Don't render if no results
+    }
 
-        const scenarios = [
-            { name: 'Avg Growth', data: countryData.avg_case, tooltip: 'Based on average market appreciation assumptions.' },
-            { name: 'Low Growth', data: countryData.low_growth_case, tooltip: 'Assumes lower than average market appreciation.' },
-            { name: 'High Growth', data: countryData.high_growth_case, tooltip: 'Assumes higher than average market appreciation.' },
-            { name: 'Zero Growth', data: countryData.zero_growth_case, tooltip: 'Assumes no property value appreciation (comparison vs renting).' },
-        ];
-
+    if (results.some(r => r.error)) {
         return (
-            <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-3 text-center">{countryName}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                    {scenarios.map(scenario => (
-                        <div key={scenario.name} className="p-3 border rounded-md bg-gray-50 relative group">
-                            <h4 className="text-sm font-medium mb-1">
-                                {scenario.name}
-                                <span className="ml-1 text-gray-400 cursor-help" title={scenario.tooltip}>ⓘ</span>
-                            </h4>
-                            <p className="text-xs text-gray-600">Net Win/Loss:</p>
-                            <p className={`text-lg font-semibold ${scenario.data?.net_win_loss >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                {formatCurrency(scenario.data?.net_win_loss)}
-                            </p>
-                            <p className="text-xs text-gray-600 mt-1">Initial Outlay:</p>
-                            <p className="text-sm text-gray-800">{formatCurrency(scenario.data?.initial_outlay_year0)}</p>
-                        </div>
-                    ))}
-                </div>
-                {/* Placeholder for detailed breakdown table */}
-                <details className="mt-4 text-sm">
-                    <summary className="cursor-pointer text-indigo-600 hover:underline">Show Detailed Breakdown (Raw JSON)</summary>
-                    <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto mt-2">{JSON.stringify(countryData, null, 2)}</pre>
-                </details>
+            <div className="mt-6 p-4 bg-red-100 border border-red-300 rounded-md">
+                <h3 className="font-medium text-red-800 mb-2">Calculation Error</h3>
+                {results.map((result, index) => result.error ? <p key={index} className="text-sm text-red-700">Scenario {index + 1}: {result.error}</p> : null)}
             </div>
         );
-    };
+    }
 
+    // Placeholder for a more sophisticated table/chart view (CR1.4)
+    // For now, display key metrics per scenario
     return (
-        <div>
-            {result.summary && (
-                <div className="mb-4 p-3 bg-indigo-50 rounded-md">
-                    <h3 className="font-medium text-lg mb-2">Summary</h3>
-                    {result.summary.spain_scenario && <p><strong>Spain:</strong> {result.summary.spain_scenario}</p>}
-                    {result.summary.denmark_scenario && <p><strong>Denmark:</strong> {result.summary.denmark_scenario}</p>}
-                </div>
-            )}
-
-            {result.calculation_details?.warnings && result.calculation_details.warnings.length > 0 && (
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <h4 className="font-medium text-yellow-800 mb-1">Warnings & Assumptions:</h4>
-                    <ul className="list-disc list-inside text-sm text-yellow-700">
-                        {result.calculation_details.warnings.map((warn, index) => <li key={index}>{warn}</li>)}
-                    </ul>
-                </div>
-            )}
-
-            {renderCountryResults(result.comparison_results?.spain, 'Spain (Barcelona)')}
-            {renderCountryResults(result.comparison_results?.denmark, 'Denmark (Copenhagen)')}
+        <div className="mt-8 pt-6 border-t">
+            <h2 className="text-2xl font-semibold mb-4 text-center">Calculation Results</h2>
+            <div className="space-y-6">
+                {results.map((result, index) => (
+                    <div key={index} className="p-4 border rounded-lg bg-gray-50 shadow-sm">
+                        <h3 className="text-lg font-semibold mb-3">
+                            Scenario {index + 1}: {result.inputs_summary?.country?.toUpperCase()} - {result.inputs_summary?.city} ({result.inputs_summary?.property_type})
+                        </h3>
+                        {result.calculation_details?.warnings && result.calculation_details.warnings.length > 0 && (
+                            <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-md text-xs">
+                                <h5 className="font-medium text-yellow-800 mb-1">Warnings:</h5>
+                                <ul className="list-disc list-inside text-yellow-700">
+                                    {result.calculation_details.warnings.map((warn, idx) => <li key={idx}>{warn}</li>)}
+                                </ul>
+                            </div>
+                        )}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                            {Object.entries(result.scenario_outcomes || {}).map(([scenarioName, outcome]) => (
+                                <div key={scenarioName} className="p-3 border rounded-md bg-white">
+                                    <h4 className="text-sm font-medium mb-1 capitalize">{scenarioName.replace('_', ' ')}</h4>
+                                    <p className="text-xs text-gray-600">Net Win/Loss:</p>
+                                    <p className={`text-lg font-semibold ${outcome.win_loss >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                        {formatCurrency(outcome.win_loss)}
+                                    </p>
+                                    <p className="text-xs text-gray-600 mt-1">Initial Outlay:</p>
+                                    <p className="text-sm text-gray-800">{formatCurrency(result.purchase_costs?.initial_outlay_year0)}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <details className="mt-4 text-sm">
+                            <summary className="cursor-pointer text-indigo-600 hover:underline">Show Full Details (Raw JSON)</summary>
+                            <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto mt-2">{JSON.stringify(result, null, 2)}</pre>
+                        </details>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
@@ -342,428 +520,205 @@ const ResultsDisplay = ({ result, currency }: { result: CalculationResult, curre
 
 function App() {
   const [backendStatus, setBackendStatus] = useState<string>('Checking...');
-  const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
+  const [calculationResult, setCalculationResult] = useState<CalculationResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('scenario-0'); // ID of the active scenario tab
 
-  // --- Form State --- 
+  // --- Form State (Refactored for Multi-Scenario) --- 
   const [personalFinance, setPersonalFinance] = useState<PersonalFinanceInputs>({});
   const [scenarioSettings, setScenarioSettings] = useState<ScenarioSettingsInputs>({ years_to_sell: 10, currency: 'EUR' });
-  const [spainInputs, setSpainInputs] = useState<Partial<CountryInputs>>({ city: 'Barcelona', property_type: 'new', renovations: [], loan_details: {}, payment_schedule: [] });
-  const [denmarkInputs, setDenmarkInputs] = useState<Partial<CountryInputs>>({ city: 'Copenhagen', property_type: 'ejer', renovations: [], loan_details: {}, payment_schedule: [] });
+  const [scenarios, setScenarios] = useState<ScenarioInputsState[]>([
+      // Initial default scenario
+      { id: 'scenario-0', name: 'Scenario 1', country: 'spain', city: 'barcelona', property_type: 'new', renovations: [] }
+  ]);
 
-  const API_BASE_URL = 'http://localhost:5000/api'; // Make this configurable if needed
-
-  useEffect(() => {
-    // Ping backend on initial load
-    fetch(`${API_BASE_URL}/ping`)
-      .then(response => response.ok ? response.json() : Promise.reject(`HTTP ${response.status}`))
-      .then(data => setBackendStatus(data.message || 'Connected'))
-      .catch(error => {
-        console.error("Error pinging backend:", error);
-        setBackendStatus(`Error connecting: ${error}. Is backend running on ${API_BASE_URL}?`);
-      });
-  }, []);
-
-  // --- Input Handlers --- 
-  const handleScenarioChange = (field: keyof ScenarioSettingsInputs, value: any) => {
-    // Ensure years_to_sell is a number
-    const processedValue = field === 'years_to_sell' ? (parseInt(value, 10) || 0) : value;
-    setScenarioSettings(prev => ({ ...prev, [field]: processedValue }));
-  };
+  // --- Handlers --- 
 
   const handlePersonalFinanceChange = (field: keyof PersonalFinanceInputs, value: any) => {
-    // Ensure numeric fields are numbers or undefined
-    const numericFields: (keyof PersonalFinanceInputs)[] = ['salary', 'tax_rate_override', 'existing_flat_value', 'existing_loan_size'];
-    const processedValue = numericFields.includes(field) ? (value === '' ? undefined : parseFloat(value)) : value;
-    setPersonalFinance(prev => ({ ...prev, [field]: processedValue }));
+    setPersonalFinance(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleCountryInputChange = (country: 'spain' | 'denmark', field: keyof CountryInputs | `loan_${keyof LoanDetails}` | 'renovations' | 'payment_schedule', value: any) => {
-    const setter = country === 'spain' ? setSpainInputs : setDenmarkInputs;
-    setter(prev => {
-        const newState = { ...prev };
-        const numericFields: (keyof CountryInputs | `loan_${keyof LoanDetails}`)[] = [
-            'new_flat_price', 'construction_completion_years', 'beckham_law_remaining_years',
-            'loan_amount', 'loan_interest_rate', 'loan_term_years'
-        ];
-        let processedValue = value;
-        if (typeof field === 'string' && numericFields.includes(field)) {
-            processedValue = value === '' ? undefined : parseFloat(value);
-            // Handle percentage conversion for interest rate
-            if (field === 'loan_interest_rate') {
-                processedValue = processedValue !== undefined ? processedValue / 100 : undefined;
-            }
-        }
-
-        if (field === 'renovations') {
-            newState.renovations = value as RenovationItem[];
-        } else if (field === 'payment_schedule') {
-            newState.payment_schedule = value as PaymentScheduleItem[];
-        } else if (typeof field === 'string' && field.startsWith('loan_')) {
-            const loanField = field.substring(5) as keyof LoanDetails;
-            newState.loan_details = { ...(newState.loan_details || {}), [loanField]: processedValue };
-        } else {
-            (newState as any)[field] = processedValue;
-        }
-        // Reset conditional fields if property type changes
-        if (field === 'property_type') {
-            if (value !== 'under_construction') {
-                delete newState.construction_completion_years;
-                newState.payment_schedule = []; // Clear schedule when not under construction
-            }
-            if (country === 'denmark' && value !== 'andels') {
-                delete newState.loan_type;
-            }
-        }
-        return newState;
-    });
+  const handleScenarioSettingsChange = (field: keyof ScenarioSettingsInputs, value: any) => {
+    setScenarioSettings(prev => ({ ...prev, [field]: value }));
+    // Potentially reset results when settings change?
+    setCalculationResult(null);
   };
 
-  // --- Calculation Trigger --- 
-  const handleCalculate = () => {
+  const handleScenarioChange = (updatedScenario: ScenarioInputsState) => {
+    setScenarios(prev => prev.map(s => s.id === updatedScenario.id ? updatedScenario : s));
+    setCalculationResult(null); // Reset results on input change
+  };
+
+  const addScenario = () => {
+      const newId = `scenario-${Date.now()}`;
+      setScenarios(prev => [
+          ...prev,
+          // Add a default new scenario (e.g., copy of the first one or a blank one)
+          { id: newId, name: `Scenario ${prev.length + 1}`, country: 'denmark', city: 'copenhagen', property_type: 'ejer', renovations: [] }
+      ]);
+      setActiveTab(newId); // Switch to the new tab
+      setCalculationResult(null);
+  };
+
+  const removeScenario = (idToRemove: string) => {
+      if (scenarios.length <= 1) return; // Don't remove the last scenario
+      setScenarios(prev => prev.filter(s => s.id !== idToRemove));
+      // If the active tab was removed, switch to the first remaining tab
+      if (activeTab === idToRemove) {
+          setActiveTab(scenarios.filter(s => s.id !== idToRemove)[0]?.id || '');
+      }
+      setCalculationResult(null);
+  };
+
+  // Helper to remove client-side IDs before sending to backend
+  const cleanScenarioForPayload = (scenario: ScenarioInputsState): ScenarioInputsPayload => {
+      const { id, name, renovations, ...payload } = scenario;
+      const cleanedRenovations = renovations.map(({ id: renoId, ...renoPayload }) => renoPayload);
+      return { ...payload, renovations: cleanedRenovations };
+  };
+
+  const handleCalculate = async () => {
     setIsLoading(true);
     setError(null);
     setCalculationResult(null);
 
-    // Basic validation (can be expanded)
-    if (!scenarioSettings.years_to_sell || scenarioSettings.years_to_sell <= 0) {
-        setError("Please enter a valid number of years to sell.");
-        setIsLoading(false);
-        return;
-    }
-    if (!spainInputs.new_flat_price && !denmarkInputs.new_flat_price) {
-        setError("Please enter a purchase price for at least one country.");
-        setIsLoading(false);
-        return;
-    }
-
-    // Validate Payment Schedule for 'under_construction'
-    const validatePaymentSchedule = (inputs: Partial<CountryInputs> | undefined): string | null => {
-        if (inputs?.property_type === 'under_construction') {
-            const schedule = inputs.payment_schedule || [];
-            if (schedule.length === 0) return "Payment schedule is required for 'Under Construction' properties.";
-            const totalPercentage = schedule.reduce((sum, p) => sum + (p.percentage || 0), 0);
-            if (Math.abs(totalPercentage - 1) > 0.001) { // Allow for floating point inaccuracies
-                return `Payment schedule percentages must sum to 100% (currently ${ (totalPercentage * 100).toFixed(1) }%).`;
-            }
-            if (!schedule.some(p => p.due_year === inputs.construction_completion_years)) {
-                // Optional: Could enforce final payment at completion year
-            }
-        }
-        return null;
+    const requestPayload: CalculationRequest = {
+        personal_finance: personalFinance,
+        scenario_settings: scenarioSettings,
+        scenarios: scenarios.map(cleanScenarioForPayload) // Send cleaned scenarios
     };
 
-    const spainPaymentError = validatePaymentSchedule(spainInputs);
-    const denmarkPaymentError = validatePaymentSchedule(denmarkInputs);
-    if (spainPaymentError) {
-        setError(`Spain Input Error: ${spainPaymentError}`);
-        setIsLoading(false);
-        return;
+    console.log("Sending request:", JSON.stringify(requestPayload, null, 2));
+
+    try {
+      // Use environment variable for API URL if available, otherwise default
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
+      const response = await fetch(`${apiUrl}/calculate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result: CalculationResponse = await response.json();
+      console.log("Received result:", result);
+      setCalculationResult(result);
+
+    } catch (err: any) {
+      console.error("Calculation error:", err);
+      setError(err.message || 'Failed to fetch calculation results.');
+    } finally {
+      setIsLoading(false);
     }
-     if (denmarkPaymentError) {
-        setError(`Denmark Input Error: ${denmarkPaymentError}`);
-        setIsLoading(false);
-        return;
-    }
-
-    // Clean up renovation items with no cost or description before sending
-    const cleanRenovations = (renos: RenovationItem[]) => 
-        renos.filter(r => r.adjusted_cost && r.adjusted_cost > 0 && r.description && r.description.trim() !== '')
-             .map(({ id, ...rest }) => rest); // Remove client-side ID before sending
-    
-    // Clean up payment schedule items
-    const cleanPaymentSchedule = (schedule: PaymentScheduleItem[] | undefined) => 
-        schedule?.filter(p => p.percentage > 0 && p.due_year >= 0);
-
-    // Build request data
-    const requestData: CalculationRequest = {
-      personal_finance: personalFinance,
-      scenario_settings: scenarioSettings,
-      spain_inputs: spainInputs.new_flat_price ? { 
-          ...spainInputs, 
-          city: 'Barcelona', 
-          renovations: cleanRenovations(spainInputs.renovations || []), 
-          payment_schedule: cleanPaymentSchedule(spainInputs.payment_schedule)
-      } : undefined,
-      denmark_inputs: denmarkInputs.new_flat_price ? { 
-          ...denmarkInputs, 
-          city: 'Copenhagen', 
-          renovations: cleanRenovations(denmarkInputs.renovations || []), 
-          payment_schedule: cleanPaymentSchedule(denmarkInputs.payment_schedule)
-      } : undefined,
-    };
-
-    // Clean up empty loan details before sending
-    const cleanLoanDetails = (inputs: Partial<CountryInputs> | undefined) => {
-        if (inputs?.loan_details) {
-            const { amount, interest_rate, term_years } = inputs.loan_details;
-            // Only include loan details if all required fields are present and valid
-            if (amount === undefined || interest_rate === undefined || term_years === undefined || amount <= 0 || interest_rate <= 0 || term_years <= 0) {
-                 delete inputs.loan_details; // Remove if incomplete or invalid
-            }
-        }
-    };
-    cleanLoanDetails(requestData.spain_inputs);
-    cleanLoanDetails(requestData.denmark_inputs);
-
-    console.log("Sending request:", JSON.stringify(requestData, null, 2)); // Log request for debugging
-
-    fetch(`${API_BASE_URL}/calculate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestData),
-    })
-      .then(response => {
-        if (!response.ok) {
-          return response.json().then(err => Promise.reject(err.error || `HTTP ${response.status}: ${err.message || 'Unknown error'}`))
-                           .catch(() => Promise.reject(`HTTP ${response.status}`));
-        }
-        return response.json();
-      })
-      .then((data: CalculationResult) => {
-        console.log("Received result:", data); // Log result for debugging
-        setCalculationResult(data);
-      })
-      .catch(error => {
-        console.error("Error calling calculation API:", error);
-        setError(`Calculation failed: ${error}`);
-      })
-      .finally(() => setIsLoading(false));
   };
+
+  // --- Effects --- 
+  useEffect(() => {
+    // Check backend status on load
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    fetch(`${apiUrl}/status`)
+      .then(response => response.json())
+      .then(data => setBackendStatus(data.status || 'Error'))
+      .catch(() => setBackendStatus('Unreachable'));
+  }, []);
 
   // --- Render --- 
   return (
-    <div className="container mx-auto p-4 font-sans">
-      {/* Header */}
+    <div className="container mx-auto p-4 md:p-8 font-sans">
       <header className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-gray-800">Property Investment Analyzer</h1>
-        <p className="text-sm text-gray-500">Barcelona vs. Copenhagen</p>
-        <p className="text-xs text-gray-400 mt-2">Backend Status: {backendStatus}</p>
+        <h1 className="text-3xl font-bold text-gray-800">Property Investment Analysis Tool</h1>
+        <p className="text-sm text-gray-500">Compare property investment scenarios (v1.4 - Multi-Scenario)</p>
+        <p className="text-xs text-gray-400">Backend Status: {backendStatus}</p>
       </header>
 
-      {/* Main Content Area - Use Grid for Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        
-        {/* Input Section (Spans 2 columns on medium screens) */}
-        <div className="md:col-span-2 bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-6 border-b pb-2">Inputs</h2>
-
-          {/* Scenario Settings */}
-          <div className="mb-6 p-4 border rounded-md bg-gray-50">
-            <h3 className="font-medium mb-3 text-lg">Scenario Settings</h3>
-            <InputField
-              label="Years to Sell"
-              value={scenarioSettings.years_to_sell}
-              onChange={(e: any) => handleScenarioChange('years_to_sell', e.target.value)}
-              tooltip="The number of years you plan to hold the property before selling. Affects appreciation and total costs."
-            />
-            <SelectField
-              label="Display Currency"
-              value={scenarioSettings.currency}
-              onChange={(e: any) => handleScenarioChange('currency', e.target.value)}
-              options={[{ value: 'EUR', label: 'EUR' }, { value: 'DKK', label: 'DKK' }]}
-              tooltip="Select the primary currency for displaying results. Calculations are performed in local currency and converted if necessary (Note: Conversion not yet implemented)."
-            />
-          </div>
-
-          {/* Personal Finance */}
-          <div className="mb-6 p-4 border rounded-md bg-gray-50">
-             <h3 className="font-medium mb-3 text-lg">Personal Finance (Optional)</h3>
-             <InputField
-                label="Gross Annual Salary"
-                value={personalFinance.salary}
-                onChange={(e: any) => handlePersonalFinanceChange('salary', e.target.value)}
-                tooltip="Your gross annual income. Used for potential future affordability/tax calculations (currently basic implementation)."
-             />
-             {/* Add other personal finance inputs here if needed */}
-          </div>
-
-          {/* Country Inputs - Side by Side */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Spain Inputs */}
-            <div className="p-4 border rounded-md">
-              <h3 className="font-medium mb-3 text-lg text-center">Spain (Barcelona)</h3>
+      {/* --- Global Settings --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 p-4 border rounded-lg bg-gray-100">
+          <div>
+              <h3 className="font-semibold mb-2 text-lg">Simulation Settings</h3>
               <InputField
-                label="Purchase Price (EUR)"
-                value={spainInputs.new_flat_price}
-                onChange={(e: any) => handleCountryInputChange('spain', 'new_flat_price', e.target.value)}
-                placeholder="e.g., 500000"
-                tooltip="The agreed purchase price of the property in EUR."
+                  label="Years to Sell"
+                  value={scenarioSettings.years_to_sell}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleScenarioSettingsChange('years_to_sell', parseInt(e.target.value, 10) || 0)}
+                  tooltip="Number of years you plan to hold the property before selling."
               />
               <SelectField
-                label="Property Type"
-                value={spainInputs.property_type}
-                onChange={(e: any) => handleCountryInputChange('spain', 'property_type', e.target.value)}
-                options={[
-                  { value: 'new', label: 'New Build' },
-                  { value: 'renovation_needed', label: 'Resale (Needs Renovation)' },
-                  { value: 'under_construction', label: 'Under Construction' },
-                ]}
-                tooltip="Select the type of property. Affects purchase taxes (VAT vs ITP) and input options."
+                  label="Display Currency"
+                  value={scenarioSettings.currency}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleScenarioSettingsChange('currency', e.target.value)}
+                  options={[{ value: 'EUR', label: 'EUR (€)' }, { value: 'DKK', label: 'DKK (kr)' }]}
+                  tooltip="Select the currency for displaying results."
               />
-              {spainInputs.property_type === 'under_construction' && (
-                <>
+          </div>
+          <div className="md:col-span-2">
+              <h3 className="font-semibold mb-2 text-lg">Personal Finance (Optional)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
                   <InputField
-                    label="Completion Time (Years)"
-                    value={spainInputs.construction_completion_years}
-                    onChange={(e: any) => handleCountryInputChange('spain', 'construction_completion_years', e.target.value)}
-                    tooltip="Estimated years from purchase until the property construction is complete and habitable."
+                      label="Annual Salary"
+                      value={personalFinance.salary}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handlePersonalFinanceChange('salary', parseInt(e.target.value, 10) || undefined)}
+                      placeholder={`Enter salary in ${scenarioSettings.currency}`}
+                      tooltip={`Your gross annual salary (used for potential tax calculations) in ${scenarioSettings.currency}.`}
                   />
-                  <PaymentScheduleInput 
-                    schedule={spainInputs.payment_schedule}
-                    onChange={(schedule) => handleCountryInputChange('spain', 'payment_schedule', schedule)}
-                  />
-                </>
-              )}
-              <RenovationInput 
-                renovations={spainInputs.renovations || []} 
-                onChange={(renos) => handleCountryInputChange('spain', 'renovations', renos)}
-                currency="EUR"
-              />
-              
-              <h4 className="font-medium mt-4 mb-2 text-md">Loan Details (Optional)</h4>
-              <InputField
-                label="Loan Amount (EUR)"
-                value={spainInputs.loan_details?.amount}
-                onChange={(e: any) => handleCountryInputChange('spain', 'loan_amount', e.target.value)}
-                tooltip="Amount borrowed for the purchase. Required if you want loan interest costs included in the win/loss calculation."
-              />
-              <InputField
-                label="Interest Rate (% Annual)"
-                value={spainInputs.loan_details?.interest_rate !== undefined ? spainInputs.loan_details.interest_rate * 100 : ''}
-                onChange={(e: any) => handleCountryInputChange('spain', 'loan_interest_rate', e.target.value)}
-                placeholder="e.g., 3.5"
-                tooltip="Annual interest rate for the loan (e.g., 3.5 for 3.5%). Required for interest calculation."
-                step="0.01"
-              />
-              <InputField
-                label="Loan Term (Years)"
-                value={spainInputs.loan_details?.term_years}
-                onChange={(e: any) => handleCountryInputChange('spain', 'loan_term_years', e.target.value)}
-                tooltip="Total duration of the loan in years (e.g., 30). Required for interest calculation."
-              />
-               <CheckboxField
-                    label="Beckham Law Active?"
-                    checked={spainInputs.beckham_law_active || false}
-                    onChange={(e: any) => handleCountryInputChange('spain', 'beckham_law_active', e.target.checked)}
-                    tooltip="Check if you are eligible for Spain's special Beckham Law tax regime for impatriates. Affects capital gains tax calculation (simplified)."
-                />
-                {spainInputs.beckham_law_active && (
-                    <InputField
-                        label="Beckham Law Remaining Years"
-                        value={spainInputs.beckham_law_remaining_years}
-                        onChange={(e: any) => handleCountryInputChange('spain', 'beckham_law_remaining_years', e.target.value)}
-                        tooltip="How many years remain on your Beckham Law eligibility at the time of selling (max 6 total). Affects capital gains tax rate."
-                    />
-                )}
-            </div>
-
-            {/* Denmark Inputs */}
-            <div className="p-4 border rounded-md">
-              <h3 className="font-medium mb-3 text-lg text-center">Denmark (Copenhagen)</h3>
-              <InputField
-                label="Purchase Price (DKK)"
-                value={denmarkInputs.new_flat_price}
-                onChange={(e: any) => handleCountryInputChange('denmark', 'new_flat_price', e.target.value)}
-                placeholder="e.g., 4000000"
-                tooltip="The agreed purchase price of the property in DKK."
-              />
-              <SelectField
-                label="Property Type"
-                value={denmarkInputs.property_type}
-                onChange={(e: any) => handleCountryInputChange('denmark', 'property_type', e.target.value)}
-                options={[
-                  { value: 'ejer', label: 'Ejerlejlighed (Owner)' },
-                  { value: 'andels', label: 'Andelslejlighed (Cooperative)' },
-                  { value: 'under_construction', label: 'Under Construction' },
-                ]}
-                tooltip="Select the type of property. Affects costs and available loan types."
-              />
-               {denmarkInputs.property_type === 'andels' && (
-                 <SelectField
-                    label="Loan Type"
-                    value={denmarkInputs.loan_type || 'standard'}
-                    onChange={(e: any) => handleCountryInputChange('denmark', 'loan_type', e.target.value)}
-                    options={[
-                        { value: 'standard', label: 'Standard Mortgage' },
-                        { value: 'andels_laan', label: 'Andelsboliglån (Co-op Loan)' },
-                    ]}
-                    tooltip="Select loan type. Andelsboliglån often has different terms/rates."
-                 />
-               )}
-              {denmarkInputs.property_type === 'under_construction' && (
-                <>
-                  <InputField
-                    label="Completion Time (Years)"
-                    value={denmarkInputs.construction_completion_years}
-                    onChange={(e: any) => handleCountryInputChange('denmark', 'construction_completion_years', e.target.value)}
-                    tooltip="Estimated years from purchase until the property construction is complete and habitable."
-                  />
-                   <PaymentScheduleInput 
-                    schedule={denmarkInputs.payment_schedule}
-                    onChange={(schedule) => handleCountryInputChange('denmark', 'payment_schedule', schedule)}
-                  />
-                </>
-              )}
-              <RenovationInput 
-                renovations={denmarkInputs.renovations || []} 
-                onChange={(renos) => handleCountryInputChange('denmark', 'renovations', renos)}
-                currency="DKK"
-              />
-              
-              <h4 className="font-medium mt-4 mb-2 text-md">Loan Details (Optional)</h4>
-              <InputField
-                label="Loan Amount (DKK)"
-                value={denmarkInputs.loan_details?.amount}
-                onChange={(e: any) => handleCountryInputChange('denmark', 'loan_amount', e.target.value)}
-                tooltip="Amount borrowed for the purchase. Required if you want loan interest costs included in the win/loss calculation."
-              />
-              <InputField
-                label="Interest Rate (% Annual)"
-                value={denmarkInputs.loan_details?.interest_rate !== undefined ? denmarkInputs.loan_details.interest_rate * 100 : ''}
-                onChange={(e: any) => handleCountryInputChange('denmark', 'loan_interest_rate', e.target.value)}
-                placeholder="e.g., 2.5"
-                tooltip="Annual interest rate for the loan (e.g., 2.5 for 2.5%). Required for interest calculation."
-                step="0.01"
-              />
-              <InputField
-                label="Loan Term (Years)"
-                value={denmarkInputs.loan_details?.term_years}
-                onChange={(e: any) => handleCountryInputChange('denmark', 'loan_term_years', e.target.value)}
-                tooltip="Total duration of the loan in years (e.g., 30). Required for interest calculation."
-              />
-            </div>
+                  {/* Add other personal finance fields here if needed */}
+                  {/* <InputField label="Tax Rate Override (%)" ... /> */}
+                  {/* <InputField label="Existing Flat Value" ... /> */}
+                  {/* <InputField label="Existing Loan Size" ... /> */}
+              </div>
           </div>
-
-          {/* Calculation Button */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={handleCalculate}
-              disabled={isLoading}
-              className={`px-6 py-3 font-semibold rounded-md text-white ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
-            >
-              {isLoading ? 'Calculating...' : 'Run Calculation'}
-            </button>
-          </div>
-
-        </div>
-
-        {/* Results Section (Spans 1 column) */}
-        <div className="md:col-span-1">
-          <div className="sticky top-4 bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold mb-6 border-b pb-2">Results</h2>
-            {error && <p className="text-red-600 bg-red-100 p-3 rounded-md mb-4">Error: {error}</p>}
-            {isLoading && <p className="text-gray-600">Loading results...</p>}
-            {!isLoading && !error && !calculationResult && <p className="text-gray-500">Enter details and run calculation.</p>}
-            
-            {calculationResult && (
-              <ResultsDisplay result={calculationResult} currency={scenarioSettings.currency} />
-            )}
-          </div>
-        </div>
-
       </div>
+
+      {/* --- Scenario Tabs --- */}
+      <div className="mb-6">
+          <div className="flex border-b mb-4 space-x-1">
+              {scenarios.map((scenario, index) => (
+                  <button
+                      key={scenario.id}
+                      onClick={() => setActiveTab(scenario.id)}
+                      className={`py-2 px-4 text-sm font-medium ${activeTab === scenario.id ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                      {scenario.name || `Scenario ${index + 1}`}
+                  </button>
+              ))}
+              <button onClick={addScenario} className="py-2 px-4 text-sm font-medium text-indigo-600 hover:text-indigo-800">+ Add Scenario</button>
+          </div>
+
+          {/* Render only the active scenario's input form */}
+          {scenarios.map((scenario) => (
+              <div key={scenario.id} className={activeTab === scenario.id ? 'block' : 'hidden'}>
+                  <ScenarioInput
+                      scenario={scenario}
+                      onChange={handleScenarioChange}
+                      onRemove={() => removeScenario(scenario.id)}
+                      currency={scenarioSettings.currency}
+                  />
+              </div>
+          ))}
+      </div>
+
+      {/* --- Calculate Button --- */}
+      <div className="text-center my-8">
+        <button
+          onClick={handleCalculate}
+          disabled={isLoading}
+          className={`px-6 py-3 text-white font-semibold rounded-md shadow ${isLoading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
+        >
+          {isLoading ? 'Calculating...' : 'Calculate Comparison'}
+        </button>
+        {error && <p className="text-red-600 mt-2 text-sm">Error: {error}</p>}
+      </div>
+
+      {/* --- Results Section --- */}
+      {calculationResult && (
+          <ResultsDisplay results={calculationResult} currency={scenarioSettings.currency} />
+      )}
+
     </div>
   );
 }

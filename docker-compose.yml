@@ -30,7 +30,7 @@ services:
       - ./frontend/public:/app/public
     depends_on:
       - backend # Ensures backend starts before frontend (useful for API calls on load)
-    environment:
+    environment: {}
       # Ensure React app knows where the backend API is
       # This might need adjustment based on how React fetches API URL
       # Often handled via proxy in package.json or environment variables
