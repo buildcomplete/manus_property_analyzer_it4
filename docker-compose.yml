@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount source code for development (optional, remove for production build)
+      - ./backend/src:/app/src
+    environment:
+      # Add any necessary environment variables here
+      # e.g., FLASK_ENV=development
+      FLASK_DEBUG: "1" # Enables debug mode in Flask
+    # If using MySQL, uncomment and configure database service
+    # depends_on:
+    #   - db
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code for development (optional, remove for production build)
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    depends_on:
+      - backend # Ensures backend starts before frontend (useful for API calls on load)
+    environment:
+      # Ensure React app knows where the backend API is
+      # This might need adjustment based on how React fetches API URL
+      # Often handled via proxy in package.json or environment variables
+      # For direct fetch as in App.tsx, ensure CORS is handled by backend
+      # WDS_SOCKET_PORT=0 # May be needed to avoid WebSocket issues in some environments
+
+# Uncomment if using a database service
+# volumes:
+#   db_data:
+
+# Uncomment if using a database service
+# services:
+#   db:
+#     image: mysql:8.0
+#     volumes:
+#       - db_data:/var/lib/mysql
+#     environment:
+#       MYSQL_ROOT_PASSWORD: password
+#       MYSQL_DATABASE: mydb
+#     ports:
+#       - "3306:3306"
+
