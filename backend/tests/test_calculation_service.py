@@ -8,7 +8,7 @@ import math # Needed for interest calculation helper
 # Add the src directory to the Python path to allow importing calculation_service
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
-from services.calculation_service import perform_calculation, DEFAULT_RATES
+from services.calculation_service import perform_calculation_for_scenario, DEFAULT_RATES
 
 # --- Helper Function for Test Expectations ---
 

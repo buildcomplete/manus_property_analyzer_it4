@@ -90,8 +90,12 @@ interface SingleScenarioResult {
     error?: string;
 }
 
-// The backend now returns a list of results, one per input scenario
-type CalculationResponse = SingleScenarioResult[];
+interface BackendResponse {
+    results_by_scenario: { scenario_id: string; result: SingleScenarioResult }[];
+    global_warnings: string[];
+    error?: string;
+}
+
 
 // --- Helper Components (Placeholder - Implement with shadcn/ui later) ---
 
@@ -170,7 +174,7 @@ const RenovationInput = ({ renovations, onChange, currency }: { renovations: Ren
 
     return (
         <div className="mb-4 p-3 border rounded-md bg-gray-50">
-            <h4 className="font-medium mb-2 text-md">Renovations (Optional)</h4>
+            <h4 className="font-medium mb-2 text-md">Renovations</h4>
             {renovations.length === 0 && <p className="text-xs text-gray-500 italic">No renovations added.</p>}
             {renovations.map((reno) => (
                 <div key={reno.id} className="flex items-center space-x-2 mb-2 border-b pb-2">
@@ -194,13 +198,11 @@ const RenovationInput = ({ renovations, onChange, currency }: { renovations: Ren
                         <span className="absolute left-1.5 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">{currency}</span>
                     </div>
                     <button onClick={() => removeRenovation(reno.id)} className="text-red-500 hover:text-red-700 p-1" title="Remove this renovation item">
-                        {/* Placeholder for Trash icon */}
                         X
                     </button>
                 </div>
             ))}
             <button onClick={addRenovation} className="mt-2 text-sm text-indigo-600 hover:text-indigo-800 flex items-center">
-                {/* Placeholder for Plus icon */}
                 +
                 Add Renovation Item
             </button>
@@ -225,7 +227,6 @@ const PaymentScheduleInput = ({ schedule, onChange }: { schedule: PaymentSchedul
         onChange(currentSchedule.filter((_, i) => i !== index));
     };
 
-    // Calculate total percentage
     const totalPercentage = (schedule || []).reduce((sum, p) => sum + (p.percentage || 0), 0);
 
     return (
@@ -333,7 +334,6 @@ const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: S
                         value={scenario.country}
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                             const newCountry = e.target.value as 'spain' | 'denmark';
-                            // Reset city and potentially type when country changes
                             const newCity = newCountry === 'spain' ? 'barcelona' : 'copenhagen';
                             const newType = newCountry === 'spain' ? 'new' : 'ejer';
                             onChange({ ...scenario, country: newCountry, city: newCity, property_type: newType });
@@ -354,371 +354,372 @@ const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: S
                         value={scenario.property_type}
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('property_type', e.target.value)}
                         options={propertyTypeOptions}
-                        tooltip="Type of property being considered."
+                        tooltip="Select the type of property."
                     />
                     <InputField
                         label="Property Price"
+                        type="number"
                         value={scenario.new_flat_price}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('new_flat_price', parseInt(e.target.value, 10) || undefined)}
-                        placeholder={`Enter price in ${currency}`}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('new_flat_price', parseInt(e.target.value, 10) || 0)}
+                        placeholder="e.g., 300000"
                         tooltip={`Purchase price of the property in ${currency}.`}
                     />
 
-                    {/* Conditional: Under Construction */}
                     {scenario.property_type === 'under_construction' && (
-                        <>
-                            <InputField
-                                label="Completion (Years from now)"
-                                value={scenario.construction_completion_years}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('construction_completion_years', parseInt(e.target.value, 10) || undefined)}
-                                placeholder="e.g., 2"
-                                tooltip="Estimated number of years until construction is complete and property is usable."
-                            />
-                            <PaymentScheduleInput
-                                schedule={scenario.payment_schedule}
-                                onChange={handlePaymentScheduleChange}
-                            />
-                        </>
+                        <InputField
+                            label="Construction Completion (Years from now)"
+                            type="number"
+                            value={scenario.construction_completion_years}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('construction_completion_years', parseInt(e.target.value, 10) || 0)}
+                            placeholder="e.g., 2"
+                            tooltip="Number of years until the property construction is completed."
+                        />
                     )}
                 </div>
 
                 {/* Column 2 */}
                 <div>
-                    <h4 className="font-medium mb-2 text-md">Loan Details (Optional)</h4>
                     <InputField
                         label="Loan Amount"
+                        type="number"
                         value={scenario.loan_details?.amount}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'amount', parseInt(e.target.value, 10) || undefined)}
-                        placeholder={`Defaults to 80% of price`}
-                        tooltip={`Amount borrowed in ${currency}. Leave blank to use 80% LTV.`}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'amount', parseInt(e.target.value, 10) || 0)}
+                        placeholder="e.g., 240000"
+                        tooltip={`Total loan amount in ${currency}.`}
                     />
                     <InputField
-                        label="Interest Rate (% p.a.)"
+                        label="Annual Interest Rate (%)"
+                        type="number"
                         value={scenario.loan_details?.interest_rate !== undefined ? scenario.loan_details.interest_rate * 100 : ''}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'interest_rate', parseFloat(e.target.value) / 100 || undefined)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'interest_rate', parseFloat(e.target.value) / 100 || 0)}
                         placeholder="e.g., 3.5"
                         step="0.01"
                         tooltip="Annual interest rate for the loan (e.g., 3.5 for 3.5%)."
                     />
                     <InputField
                         label="Loan Term (Years)"
+                        type="number"
                         value={scenario.loan_details?.term_years}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'term_years', parseInt(e.target.value, 10) || undefined)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'term_years', parseInt(e.target.value, 10) || 0)}
                         placeholder="e.g., 30"
-                        tooltip="Total duration of the loan in years."
+                        tooltip="Total term of the loan in years."
                     />
 
-                    {/* Conditional: Denmark */}
-                    {scenario.country === 'denmark' && (
-                        <SelectField
-                            label="Loan Type (Denmark)"
-                            value={scenario.loan_type || 'standard'}
-                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('loan_type', e.target.value)}
-                            options={loanTypeOptions}
-                            disabled={scenario.property_type !== 'andels'} // Only relevant for Andels
-                            tooltip="Specific loan type, relevant for Andelslejlighed."
-                        />
-                    )}
-
-                    {/* Conditional: Spain */}
                     {scenario.country === 'spain' && (
                         <>
                             <CheckboxField
                                 label="Beckham Law Active?"
                                 checked={scenario.beckham_law_active || false}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('beckham_law_active', e.target.checked)}
-                                tooltip="Check if the special Beckham Law tax regime applies."
+                                tooltip="Is the Beckham Law (special tax regime for impatriates) applicable?"
                             />
-                            <InputField
-                                label="Beckham Law Remaining Years"
-                                value={scenario.beckham_law_remaining_years}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('beckham_law_remaining_years', parseInt(e.target.value, 10) || undefined)}
-                                placeholder="e.g., 4"
-                                disabled={!scenario.beckham_law_active}
-                                tooltip="Number of years remaining under the Beckham Law regime."
-                            />
+                            {scenario.beckham_law_active && (
+                                <InputField
+                                    label="Beckham Law Remaining Years"
+                                    type="number"
+                                    value={scenario.beckham_law_remaining_years}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('beckham_law_remaining_years', parseInt(e.target.value, 10) || 0)}
+                                    placeholder="e.g., 4"
+                                    tooltip="Number of years remaining under the Beckham Law."
+                                />
+                            )}
                         </>
+                    )}
+
+                    {scenario.country === 'denmark' && scenario.property_type === 'andels' && (
+                        <SelectField
+                            label="Loan Type (for Andels)"
+                            value={scenario.loan_type || 'standard'}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('loan_type', e.target.value)}
+                            options={loanTypeOptions}
+                            tooltip="Select the type of loan for the Andelsbolig."
+                        />
                     )}
                 </div>
             </div>
 
-            {/* Renovations - Always visible (CR1.1) */}
-            <RenovationInput
-                renovations={scenario.renovations}
-                onChange={handleRenovationChange}
-                currency={currency}
-            />
-        </div>
-    );
-};
+            <RenovationInput renovations={scenario.renovations} onChange={handleRenovationChange} currency={currency} />
 
-
-// --- Results Display Component (Adjusted for Multi-Scenario) ---
-const ResultsDisplay = ({ results, currency }: { results: CalculationResponse | null, currency: string }) => {
-    const formatCurrency = (value: number | undefined) => {
-        if (value === undefined || value === null) return '-';
-        return new Intl.NumberFormat(currency === 'EUR' ? 'de-DE' : 'da-DK', { style: 'currency', currency: currency, maximumFractionDigits: 0 }).format(value);
-    };
-
-    if (!results) {
-        return null; // Don't render if no results
-    }
-
-    if (results.some(r => r.error)) {
-        return (
-            <div className="mt-6 p-4 bg-red-100 border border-red-300 rounded-md">
-                <h3 className="font-medium text-red-800 mb-2">Calculation Error</h3>
-                {results.map((result, index) => result.error ? <p key={index} className="text-sm text-red-700">Scenario {index + 1}: {result.error}</p> : null)}
-            </div>
-        );
-    }
-
-    // Placeholder for a more sophisticated table/chart view (CR1.4)
-    // For now, display key metrics per scenario
-    return (
-        <div className="mt-8 pt-6 border-t">
-            <h2 className="text-2xl font-semibold mb-4 text-center">Calculation Results</h2>
-            <div className="space-y-6">
-                {results.map((result, index) => (
-                    <div key={index} className="p-4 border rounded-lg bg-gray-50 shadow-sm">
-                        <h3 className="text-lg font-semibold mb-3">
-                            Scenario {index + 1}: {result.inputs_summary?.country?.toUpperCase()} - {result.inputs_summary?.city} ({result.inputs_summary?.property_type})
-                        </h3>
-                        {result.calculation_details?.warnings && result.calculation_details.warnings.length > 0 && (
-                            <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-md text-xs">
-                                <h5 className="font-medium text-yellow-800 mb-1">Warnings:</h5>
-                                <ul className="list-disc list-inside text-yellow-700">
-                                    {result.calculation_details.warnings.map((warn, idx) => <li key={idx}>{warn}</li>)}
-                                </ul>
-                            </div>
-                        )}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                            {Object.entries(result.scenario_outcomes || {}).map(([scenarioName, outcome]) => (
-                                <div key={scenarioName} className="p-3 border rounded-md bg-white">
-                                    <h4 className="text-sm font-medium mb-1 capitalize">{scenarioName.replace('_', ' ')}</h4>
-                                    <p className="text-xs text-gray-600">Net Win/Loss:</p>
-                                    <p className={`text-lg font-semibold ${outcome.win_loss >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                        {formatCurrency(outcome.win_loss)}
-                                    </p>
-                                    <p className="text-xs text-gray-600 mt-1">Initial Outlay:</p>
-                                    <p className="text-sm text-gray-800">{formatCurrency(result.purchase_costs?.initial_outlay_year0)}</p>
-                                </div>
-                            ))}
-                        </div>
-                        <details className="mt-4 text-sm">
-                            <summary className="cursor-pointer text-indigo-600 hover:underline">Show Full Details (Raw JSON)</summary>
-                            <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto mt-2">{JSON.stringify(result, null, 2)}</pre>
-                        </details>
-                    </div>
-                ))}
-            </div>
+            {scenario.property_type === 'under_construction' && (
+                <PaymentScheduleInput schedule={scenario.payment_schedule} onChange={handlePaymentScheduleChange} />
+            )}
         </div>
     );
 };
 
 // --- Main App Component ---
-
 function App() {
-  const [backendStatus, setBackendStatus] = useState<string>('Checking...');
-  const [calculationResult, setCalculationResult] = useState<CalculationResponse | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('scenario-0'); // ID of the active scenario tab
-
-  // --- Form State (Refactored for Multi-Scenario) --- 
   const [personalFinance, setPersonalFinance] = useState<PersonalFinanceInputs>({});
-  const [scenarioSettings, setScenarioSettings] = useState<ScenarioSettingsInputs>({ years_to_sell: 10, currency: 'EUR' });
+  const [scenarioSettings, setScenarioSettings] = useState<ScenarioSettingsInputs>({ years_to_sell: 5, currency: 'EUR' });
   const [scenarios, setScenarios] = useState<ScenarioInputsState[]>([
-      // Initial default scenario
-      { id: 'scenario-0', name: 'Scenario 1', country: 'spain', city: 'barcelona', property_type: 'new', renovations: [] }
+    { id: 's1', name: 'Scenario 1', country: 'spain', city: 'barcelona', property_type: 'new', new_flat_price: 300000, renovations: [], loan_details: { amount: 240000, interest_rate: 0.035, term_years: 30 } },
   ]);
-
-  // --- Handlers --- 
+  const [activeTab, setActiveTab] = useState<string>('s1');
+  const [results, setResults] = useState<BackendResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handlePersonalFinanceChange = (field: keyof PersonalFinanceInputs, value: any) => {
-    setPersonalFinance(prev => ({ ...prev, [field]: value }));
+    setPersonalFinance(prev => ({ ...prev, [field]: value === '' ? undefined : value }));
   };
 
   const handleScenarioSettingsChange = (field: keyof ScenarioSettingsInputs, value: any) => {
     setScenarioSettings(prev => ({ ...prev, [field]: value }));
-    // Potentially reset results when settings change?
-    setCalculationResult(null);
-  };
-
-  const handleScenarioChange = (updatedScenario: ScenarioInputsState) => {
-    setScenarios(prev => prev.map(s => s.id === updatedScenario.id ? updatedScenario : s));
-    setCalculationResult(null); // Reset results on input change
+    if (field === 'currency') {
+        // Potentially convert existing monetary values or clear them
+        console.log("Currency changed, consider value conversions or resets.");
+    }
   };
 
   const addScenario = () => {
-      const newId = `scenario-${Date.now()}`;
-      setScenarios(prev => [
-          ...prev,
-          // Add a default new scenario (e.g., copy of the first one or a blank one)
-          { id: newId, name: `Scenario ${prev.length + 1}`, country: 'denmark', city: 'copenhagen', property_type: 'ejer', renovations: [] }
-      ]);
-      setActiveTab(newId); // Switch to the new tab
-      setCalculationResult(null);
+    const newScenarioId = `s${Date.now()}`;
+    setScenarios(prev => [...prev, {
+        id: newScenarioId,
+        name: `Scenario ${prev.length + 1}`,
+        country: 'spain',
+        city: 'barcelona',
+        property_type: 'new',
+        new_flat_price: undefined,
+        renovations: [],
+        loan_details: { amount: undefined, interest_rate: undefined, term_years: undefined }
+    }]);
+    setActiveTab(newScenarioId);
+  };
+
+  const updateScenario = (updatedScenario: ScenarioInputsState) => {
+    setScenarios(prev => prev.map(s => s.id === updatedScenario.id ? updatedScenario : s));
   };
 
   const removeScenario = (idToRemove: string) => {
-      if (scenarios.length <= 1) return; // Don't remove the last scenario
-      setScenarios(prev => prev.filter(s => s.id !== idToRemove));
-      // If the active tab was removed, switch to the first remaining tab
-      if (activeTab === idToRemove) {
-          setActiveTab(scenarios.filter(s => s.id !== idToRemove)[0]?.id || '');
-      }
-      setCalculationResult(null);
+    setScenarios(prev => prev.filter(s => s.id !== idToRemove));
+    if (activeTab === idToRemove && scenarios.length > 1) {
+        setActiveTab(scenarios.filter(s => s.id !== idToRemove)[0].id);
+    } else if (scenarios.length <= 1) {
+        setActiveTab(''); // Or add a default scenario if all are removed
+    }
   };
 
-  // Helper to remove client-side IDs before sending to backend
-  const cleanScenarioForPayload = (scenario: ScenarioInputsState): ScenarioInputsPayload => {
-      const { id, name, renovations, ...payload } = scenario;
-      const cleanedRenovations = renovations.map(({ id: renoId, ...renoPayload }) => renoPayload);
-      return { ...payload, renovations: cleanedRenovations };
+  // Function to clean client-side IDs from renovations before sending to backend
+  const cleanRenovationsForPayload = (renos: RenovationItem[]): RenovationPayloadItem[] => {
+    return renos.map(({ id, ...rest }) => rest);
   };
 
   const handleCalculate = async () => {
     setIsLoading(true);
     setError(null);
-    setCalculationResult(null);
+    setResults(null);
 
-    const requestPayload: CalculationRequest = {
-        personal_finance: personalFinance,
-        scenario_settings: scenarioSettings,
-        scenarios: scenarios.map(cleanScenarioForPayload) // Send cleaned scenarios
+    const scenariosPayload: ScenarioInputsPayload[] = scenarios.map(s => {
+        const { id, name, renovations, ...payload } = s; // Exclude client-side id and name
+        return { ...payload, renovations: cleanRenovationsForPayload(renovations) };
+    });
+
+    const requestBody: CalculationRequest = {
+      personal_finance: personalFinance,
+      scenario_settings: scenarioSettings,
+      scenarios: scenariosPayload,
     };
 
-    console.log("Sending request:", JSON.stringify(requestPayload, null, 2));
-
     try {
-      // Use environment variable for API URL if available, otherwise default
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
-      const response = await fetch(`${apiUrl}/calculate`, {
+      const response = await fetch('http://localhost:5000/api/calculate', { // Corrected API endpoint
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestPayload),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
+        throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
       }
-
-      const result: CalculationResponse = await response.json();
-      console.log("Received result:", result);
-      setCalculationResult(result);
-
-    } catch (err: any) {
-      console.error("Calculation error:", err);
-      setError(err.message || 'Failed to fetch calculation results.');
-    } finally {
-      setIsLoading(false);
+      const data: BackendResponse = await response.json();
+      setResults(data);
+      if (data.error) {
+        setError(data.error);
+      }
+    } catch (err: any) { // Explicitly type err as any or unknown
+      setError(err.message || 'An unknown error occurred');
+      console.error('Calculation error:', err);
     }
+    setIsLoading(false);
   };
 
-  // --- Effects --- 
-  useEffect(() => {
-    // Check backend status on load
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-    fetch(`${apiUrl}/status`)
-      .then(response => response.json())
-      .then(data => setBackendStatus(data.status || 'Error'))
-      .catch(() => setBackendStatus('Unreachable'));
-  }, []);
+  const activeScenario = scenarios.find(s => s.id === activeTab);
 
-  // --- Render --- 
   return (
-    <div className="container mx-auto p-4 md:p-8 font-sans">
+    <div className="container mx-auto p-4 font-sans bg-gray-50 min-h-screen">
       <header className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-gray-800">Property Investment Analysis Tool</h1>
-        <p className="text-sm text-gray-500">Compare property investment scenarios (v1.4 - Multi-Scenario)</p>
-        <p className="text-xs text-gray-400">Backend Status: {backendStatus}</p>
+        <h1 className="text-4xl font-bold text-indigo-700">Property Investment Analyzer</h1>
+        <p className="text-md text-gray-600">Compare property investment scenarios in Spain & Denmark</p>
       </header>
 
-      {/* --- Global Settings --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 p-4 border rounded-lg bg-gray-100">
-          <div>
-              <h3 className="font-semibold mb-2 text-lg">Simulation Settings</h3>
-              <InputField
-                  label="Years to Sell"
-                  value={scenarioSettings.years_to_sell}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleScenarioSettingsChange('years_to_sell', parseInt(e.target.value, 10) || 0)}
-                  tooltip="Number of years you plan to hold the property before selling."
-              />
-              <SelectField
-                  label="Display Currency"
-                  value={scenarioSettings.currency}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleScenarioSettingsChange('currency', e.target.value)}
-                  options={[{ value: 'EUR', label: 'EUR (€)' }, { value: 'DKK', label: 'DKK (kr)' }]}
-                  tooltip="Select the currency for displaying results."
-              />
-          </div>
-          <div className="md:col-span-2">
-              <h3 className="font-semibold mb-2 text-lg">Personal Finance (Optional)</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
-                  <InputField
-                      label="Annual Salary"
-                      value={personalFinance.salary}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handlePersonalFinanceChange('salary', parseInt(e.target.value, 10) || undefined)}
-                      placeholder={`Enter salary in ${scenarioSettings.currency}`}
-                      tooltip={`Your gross annual salary (used for potential tax calculations) in ${scenarioSettings.currency}.`}
-                  />
-                  {/* Add other personal finance fields here if needed */}
-                  {/* <InputField label="Tax Rate Override (%)" ... /> */}
-                  {/* <InputField label="Existing Flat Value" ... /> */}
-                  {/* <InputField label="Existing Loan Size" ... /> */}
-              </div>
-          </div>
-      </div>
+      {/* Global Settings Section */}
+      <section className="mb-6 p-4 bg-white shadow-md rounded-lg">
+        <h2 className="text-xl font-semibold mb-3 text-indigo-600 border-b pb-2">Global Simulation Settings</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <InputField
+                label="Years to Sell"
+                type="number"
+                value={scenarioSettings.years_to_sell}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleScenarioSettingsChange('years_to_sell', parseInt(e.target.value, 10) || 0)}
+                tooltip="Number of years you plan to hold the property before selling."
+            />
+            <SelectField
+                label="Display Currency"
+                value={scenarioSettings.currency}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleScenarioSettingsChange('currency', e.target.value)}
+                options={[{ value: 'EUR', label: 'EUR (€)' }, { value: 'DKK', label: 'DKK (kr.)' }]}
+                tooltip="Currency for all monetary inputs and results."
+            />
+        </div>
+      </section>
 
-      {/* --- Scenario Tabs --- */}
-      <div className="mb-6">
-          <div className="flex border-b mb-4 space-x-1">
-              {scenarios.map((scenario, index) => (
-                  <button
-                      key={scenario.id}
-                      onClick={() => setActiveTab(scenario.id)}
-                      className={`py-2 px-4 text-sm font-medium ${activeTab === scenario.id ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                      {scenario.name || `Scenario ${index + 1}`}
-                  </button>
-              ))}
-              <button onClick={addScenario} className="py-2 px-4 text-sm font-medium text-indigo-600 hover:text-indigo-800">+ Add Scenario</button>
-          </div>
+      <section className="mb-6 p-4 bg-white shadow-md rounded-lg">
+        <h2 className="text-xl font-semibold mb-3 text-indigo-600 border-b pb-2">Personal Finance (Optional)</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+            <InputField 
+                label="Annual Gross Salary"
+                value={personalFinance.salary}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handlePersonalFinanceChange('salary', parseInt(e.target.value, 10) || undefined)}
+                placeholder="e.g., 60000"
+                tooltip={`Your annual gross salary in ${scenarioSettings.currency}. Used for some tax estimations.`}
+            />
+            {/* Add other personal finance fields here if needed */}
+        </div>
+      </section>
 
-          {/* Render only the active scenario's input form */}
-          {scenarios.map((scenario) => (
-              <div key={scenario.id} className={activeTab === scenario.id ? 'block' : 'hidden'}>
-                  <ScenarioInput
-                      scenario={scenario}
-                      onChange={handleScenarioChange}
-                      onRemove={() => removeScenario(scenario.id)}
-                      currency={scenarioSettings.currency}
-                  />
-              </div>
-          ))}
-      </div>
+      {/* Scenarios Section */}
+      <section className="mb-6">
+        <div className="flex border-b mb-4">
+            {scenarios.map(scenario => (
+                <button
+                    key={scenario.id}
+                    className={`py-2 px-4 -mb-px font-medium text-sm focus:outline-none 
+                                ${activeTab === scenario.id 
+                                    ? 'border-b-2 border-indigo-500 text-indigo-600'
+                                    : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                    onClick={() => setActiveTab(scenario.id)}
+                >
+                    {scenario.name}
+                </button>
+            ))}
+            <button onClick={addScenario} className="py-2 px-4 text-indigo-600 hover:text-indigo-800 text-sm">+ Add Scenario</button>
+        </div>
 
-      {/* --- Calculate Button --- */}
-      <div className="text-center my-8">
+        {activeScenario && (
+            <ScenarioInput 
+                key={activeScenario.id} // Ensure re-render on tab change if needed
+                scenario={activeScenario} 
+                onChange={updateScenario} 
+                onRemove={() => removeScenario(activeScenario.id)}
+                currency={scenarioSettings.currency}
+            />
+        )}
+      </section>
+
+      <div className="text-center mb-8">
         <button
           onClick={handleCalculate}
           disabled={isLoading}
-          className={`px-6 py-3 text-white font-semibold rounded-md shadow ${isLoading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
+          className="px-8 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? 'Calculating...' : 'Calculate Comparison'}
+          {isLoading ? 'Calculating...' : 'Calculate Investment Scenarios'}
         </button>
-        {error && <p className="text-red-600 mt-2 text-sm">Error: {error}</p>}
       </div>
 
-      {/* --- Results Section --- */}
-      {calculationResult && (
-          <ResultsDisplay results={calculationResult} currency={scenarioSettings.currency} />
+      {error && (
+        <div className="mb-4 p-4 bg-red-100 text-red-700 border border-red-300 rounded-md">
+          <h3 className="font-bold">Error:</h3>
+          <pre className="whitespace-pre-wrap">{error}</pre>
+        </div>
       )}
 
+      {results && (
+        <section className="p-4 bg-white shadow-md rounded-lg">
+          <h2 className="text-2xl font-semibold mb-4 text-indigo-700">Calculation Results</h2>
+          {results.global_warnings && results.global_warnings.length > 0 && (
+            <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 border border-yellow-300 rounded-md">
+                <h4 className="font-bold">Global Warnings:</h4>
+                <ul className="list-disc list-inside text-sm">
+                    {results.global_warnings.map((warn, idx) => <li key={idx}>{warn}</li>)}
+                </ul>
+            </div>
+          )}
+          {results.results_by_scenario?.map(({ scenario_id, result }) => {
+            const scenarioName = scenarios.find(s => s.id === scenario_id)?.name || scenario_id;
+            if (result.error) {
+                return (
+                    <div key={scenario_id} className="mb-6 p-3 border border-red-300 rounded-md bg-red-50">
+                        <h3 className="text-xl font-semibold text-red-600">{scenarioName} - Error</h3>
+                        <p className="text-red-700">{result.error}</p>
+                    </div>
+                );
+            }
+            return (
+                <div key={scenario_id} className="mb-6 p-4 border border-gray-200 rounded-lg shadow">
+                    <h3 className="text-xl font-semibold mb-3 text-indigo-600">Results for: {scenarioName}</h3>
+                    
+                    {result.calculation_details?.warnings && result.calculation_details.warnings.length > 0 && (
+                        <div className="mb-3 p-2 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md text-sm">
+                            <h5 className="font-semibold">Scenario Warnings:</h5>
+                            <ul className="list-disc list-inside">
+                                {result.calculation_details.warnings.map((warn, idx) => <li key={idx}>{warn}</li>)}
+                            </ul>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                        <div>
+                            <p className="text-sm text-gray-600">Total Investment Cost:</p>
+                            <p className="text-lg font-semibold">{scenarioSettings.currency} {result.purchase_costs?.total_investment_cost?.toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-600">Initial Outlay (Year 0):</p>
+                            <p className="text-lg font-semibold">{scenarioSettings.currency} {result.purchase_costs?.initial_outlay_year0?.toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-600">Total Running Costs (over {scenarioSettings.years_to_sell} years):</p>
+                            <p className="text-lg font-semibold">{scenarioSettings.currency} {result.running_costs?.total?.toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-600">Total Loan Interest Paid (over {scenarioSettings.years_to_sell} years):</p>
+                            <p className="text-lg font-semibold">{scenarioSettings.currency} {result.total_loan_interest_paid_over_hold?.toLocaleString()}</p>
+                        </div>
+                    </div>
+
+                    <h4 className="text-md font-semibold mt-4 mb-2 text-gray-700">Win/Loss Scenarios (after {scenarioSettings.years_to_sell} years):</h4>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scenario</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Est. Selling Price</th>
+                                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Est. Win/Loss</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {Object.entries(result.scenario_outcomes || {}).map(([key, outcome]) => (
+                                    <tr key={key}>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{scenarioSettings.currency} {outcome.selling_price?.toLocaleString()}</td>
+                                        <td className={`px-4 py-2 whitespace-nowrap text-sm font-semibold ${outcome.win_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {scenarioSettings.currency} {outcome.win_loss?.toLocaleString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <details className="mt-4 text-xs text-gray-500">
+                        <summary className="cursor-pointer hover:text-gray-700">View Raw Scenario Result JSON</summary>
+                        <pre className="mt-2 p-2 bg-gray-100 rounded overflow-auto max-h-60">{JSON.stringify(result, null, 2)}</pre>
+                    </details>
+                </div>
+            );
+          })}
+        </section>
+      )}
     </div>
   );
 }
