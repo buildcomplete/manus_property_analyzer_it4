@@ -10,8 +10,10 @@ WORKDIR /app
 COPY ./requirements.txt /app/
 
 # Install any needed packages specified in requirements.txt
+# Activate virtual environment (though less critical in Docker)
 # Using --no-cache-dir to reduce image size
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m venv venv
+RUN . venv/bin/activate && pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the backend application code into the container at /app
 COPY ./src /app/src
@@ -24,5 +26,5 @@ EXPOSE 5000
 
 # Run main.py when the container launches
 # Ensure the app runs on 0.0.0.0 to be accessible from outside the container
-CMD ["python", "src/main.py"]
+CMD [". venv/bin/activate && python", "src/main.py"]
 
