@@ -541,10 +541,8 @@ function App() {
                 beckham_law_remaining_years,
                 loan_type,
                 construction_completion_years,
-                payment_schedule,
-
-                // Fields to exclude from 'inputs' (like 'name' which is UI-only)
-                name, // Exclude name from 'inputs'
+                payment_schedule,                // Fields to exclude from \'inputs\' (like \'name\' which is UI-only)
+                // name, // Exclude name from \'inputs\'
             } = scenarioState;
 
             const cleanedRenovations = renovations.map(({ id: renoId, ...reno }) => reno);
