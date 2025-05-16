@@ -1,4 +1,4 @@
-# Property Investment Analysis Tool (v1.5.1)
+# Property Investment Analysis Tool (v1.5.2)
 
 ## Overview
 
@@ -102,19 +102,19 @@ VITE_API_URL: "http://backend:5000/api"
 
 
 
-## Key Features (v1.5)
+## Key Features (v1.5.2)
 
-Includes all features from v1.4, plus:
+Includes all features from v1.5.1, plus:
 
--   **Renting Scenario Analysis (Baseline Comparison):**
-    -   **Inputs:** Users can optionally define a renting scenario by providing:
-        -   Monthly Rent
-        -   Monthly Water Cost
-        -   Monthly Utilities Cost
-        -   Monthly Parking Cost
-        -   Annual percentage increment for each of the above costs.
-    -   **Calculation:** The tool calculates the total cost of renting over the specified `Years to Sell`, accounting for the annual increments for each cost component.
-    -   **Results Display:**
-        -   The "Total Renting Cost" is displayed as a "Base Index" for comparison.
-        -   The purchase scenario results table is augmented with an "Index Adjusted Profit / (Loss)" column. This column shows the purchase scenario's raw profit/loss minus the total renting cost, providing a direct comparison against the renting baseline.
-        -   The results table row order is now: Zero Growth, Average Growth, Low Risk, High Risk.
+- **Backend Cleanup:**
+  - Removed unused boilerplate code and files for a leaner, more maintainable codebase
+  - Eliminated unnecessary user routes and models that were not used by the application
+  - Streamlined backend structure to focus only on the property investment analysis functionality
+
+## Key Features (v1.5.1)
+
+Includes all features from v1.5, plus:
+
+- **Loan Helper Button:** Added "Set to 80%" helper button next to the loan amount field for quick standard loan-to-value ratio setting
+- **API URL Environment Variable:** Frontend now uses `VITE_API_URL` environment variable for flexible deployment
+- **Backend Robustness:** Improved error handling to ensure calculation results are always properly structured
