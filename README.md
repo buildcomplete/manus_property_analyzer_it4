@@ -1,4 +1,4 @@
-# Property Investment Analysis Tool (v1.5)
+# Property Investment Analysis Tool (v1.5.1)
 
 ## Overview
 
@@ -45,7 +45,7 @@ The project follows a monorepo structure:
 
 **Steps:**
 
-1.  **Extract the archive (`property_analyzer_v1.4.tar.gz`).**
+1.  **Extract the archive (`property_analyzer_v1.5.1.tar.gz`).**
 2.  **Navigate to the project root directory (`property_analyzer`).**
 3.  **Build and start the services:**
     ```bash
@@ -55,6 +55,28 @@ The project follows a monorepo structure:
 4.  **Access the application:**
     -   Frontend: `http://localhost:3000`
     -   Backend API: `http://localhost:5000`
+
+## Environment Configuration
+
+The application uses environment variables for flexible deployment:
+
+-   **API URL Configuration:** The frontend uses the `VITE_API_URL` environment variable to connect to the backend API.
+    -   In `docker-compose.yml`, this is set to `http://localhost:5000/api` by default.
+    -   For different deployment environments, modify this value in `docker-compose.yml` or provide it at runtime.
+    -   If not specified, the application falls back to a development proxy configuration in `vite.config.ts`.
+
+**Example configurations:**
+
+```yaml
+# For local development with Docker
+VITE_API_URL: "http://localhost:5000/api"
+
+# For production deployment with a different domain
+VITE_API_URL: "https://api.example.com/api"
+
+# For internal Docker network communication
+VITE_API_URL: "http://backend:5000/api"
+```
 
 ## Development Notes
 

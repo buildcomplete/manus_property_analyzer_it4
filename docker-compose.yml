@@ -30,11 +30,9 @@ services:
       - ./frontend/public:/app/public
     depends_on:
       - backend # Ensures backend starts before frontend (useful for API calls on load)
-    environment: {}
-      # Ensure React app knows where the backend API is
-      # This might need adjustment based on how React fetches API URL
-      # Often handled via proxy in package.json or environment variables
-      # For direct fetch as in App.tsx, ensure CORS is handled by backend
+    environment:
+      # API URL for the frontend to connect to the backend
+      VITE_API_URL: "http://localhost:5000/api"
       # WDS_SOCKET_PORT=0 # May be needed to avoid WebSocket issues in some environments
 
 # Uncomment if using a database service

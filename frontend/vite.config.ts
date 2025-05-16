@@ -9,5 +9,14 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      // Fallback proxy for development without environment variables
+      '/api': {
+        target: 'http://backend:5000',
+        changeOrigin: true,
+      }
+    }
+  }
 })
 
