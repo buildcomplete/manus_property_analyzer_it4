@@ -502,13 +502,28 @@ const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: S
                 {/* Column 2 */}
                 <div>
                     <h4 className="font-medium mb-2 text-md">Loan Details</h4>
-                    <InputField
-                        label={`Loan Amount (${currency})`}
-                        value={scenario.loan_details?.amount}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'amount', e.target.value)}
-                        placeholder="e.g., 240000"
-                        tooltip="The total amount of the loan."
-                    />
+                    <div className="relative">
+                        <InputField
+                            label={`Loan Amount (${currency})`}
+                            value={scenario.loan_details?.amount}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'amount', e.target.value)}
+                            placeholder="e.g., 240000"
+                            tooltip="The total amount of the loan."
+                        />
+                        <button 
+                            onClick={() => {
+                                if (scenario.new_flat_price) {
+                                    const eightyPercent = Math.round(scenario.new_flat_price * 0.8);
+                                    handleNestedChange('loan_details', 'amount', eightyPercent);
+                                }
+                            }}
+                            className="absolute right-0 top-8 px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 border border-indigo-300"
+                            title="Set loan amount to 80% of property price"
+                            type="button"
+                        >
+                            Set to 80%
+                        </button>
+                    </div>
                     <InputField
                         label="Interest Rate (% p.a.)"
                         type="number"

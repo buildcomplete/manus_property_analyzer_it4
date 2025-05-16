@@ -79,9 +79,13 @@ def calculate_investment():
             if scenario_result_data.get("calculation_details", {}).get("warnings"):
                 warnings.update(scenario_result_data["calculation_details"]["warnings"])
             
+            # Ensure overall_summary exists in the result
+            if "overall_summary" not in scenario_result_data:
+                scenario_result_data["overall_summary"] = {"win_loss_eur": 0}
+                
             # Add index_adjusted_profit if renting cost is available
             if renting_results and not renting_results.get("error"):
-                current_win_loss = scenario_result_data.get("overall_summary", {}).get("win_loss_eur", 0) # Assuming win_loss_eur is the key
+                current_win_loss = scenario_result_data["overall_summary"].get("win_loss_eur", 0)
                 scenario_result_data["overall_summary"]["index_adjusted_profit_eur"] = current_win_loss - total_renting_cost
             
             results.append({"scenario_id": scenario_id, "result": scenario_result_data})
