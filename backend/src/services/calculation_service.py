@@ -448,3 +448,61 @@ def perform_calculation_for_scenario(data):
 
     return final_result
 
+
+
+
+def calculate_renting_scenario_cost(renting_inputs, years_to_sell):
+    """Calculates the total cost of renting over a specified period, with annual increments."""
+    results = {
+        "total_renting_cost": 0,
+        "breakdown_annual": [], # List of dicts, one for each year
+        "inputs_summary": renting_inputs,
+        "warnings": []
+    }
+
+    if not renting_inputs or not isinstance(renting_inputs, dict) or years_to_sell <= 0:
+        results["error"] = "Invalid renting inputs or years_to_sell."
+        return results
+
+    # Get initial monthly costs and annual increments
+    monthly_rent = renting_inputs.get("monthly_rent", 0)
+    monthly_water = renting_inputs.get("monthly_water", 0)
+    monthly_utilities = renting_inputs.get("monthly_utilities", 0)
+    monthly_parking = renting_inputs.get("monthly_parking", 0)
+
+    annual_rent_increment = renting_inputs.get("annual_rent_increment", 0)
+    annual_water_increment = renting_inputs.get("annual_water_increment", 0)
+    annual_utilities_increment = renting_inputs.get("annual_utilities_increment", 0)
+    annual_parking_increment = renting_inputs.get("annual_parking_increment", 0)
+
+    current_annual_rent = monthly_rent * 12
+    current_annual_water = monthly_water * 12
+    current_annual_utilities = monthly_utilities * 12
+    current_annual_parking = monthly_parking * 12
+
+    cumulative_total_cost = 0
+
+    for year in range(1, int(years_to_sell) + 1):
+        year_costs = {
+            "year": year,
+            "rent_cost": current_annual_rent,
+            "water_cost": current_annual_water,
+            "utilities_cost": current_annual_utilities,
+            "parking_cost": current_annual_parking,
+        }
+        
+        annual_cost_for_year = current_annual_rent + current_annual_water + current_annual_utilities + current_annual_parking
+        year_costs["total_annual_cost"] = annual_cost_for_year
+        results["breakdown_annual"].append(year_costs)
+        cumulative_total_cost += annual_cost_for_year
+
+        # Apply increments for the next year
+        current_annual_rent *= (1 + annual_rent_increment)
+        current_annual_water *= (1 + annual_water_increment)
+        current_annual_utilities *= (1 + annual_utilities_increment)
+        current_annual_parking *= (1 + annual_parking_increment)
+        
+    results["total_renting_cost"] = cumulative_total_cost
+    return results
+
+
