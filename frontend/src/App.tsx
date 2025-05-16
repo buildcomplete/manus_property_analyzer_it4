@@ -703,8 +703,8 @@ function App() {
         };
 
         try {
-            // Get API URL from environment variable or use default
-            const apiUrl = import.meta.env.VITE_API_URL || '/api';
+            // Get API URL from runtime config (loaded from public/config.js) or fallback to environment variable or default
+            const apiUrl = (window as any).RUNTIME_CONFIG?.API_URL || import.meta.env.VITE_API_URL || '/api';
             console.log(`Using API URL: ${apiUrl}`);
             
             const response = await fetch(`${apiUrl}/calculate`, {
