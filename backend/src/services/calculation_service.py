@@ -306,203 +306,215 @@ def calculate_selling_costs(country, city, selling_price, purchase_price, purcha
     costs["breakdown"]["selling_agency_fee"] = agency_fee
     costs["total"] += agency_fee
 
-    capital_gain_base = selling_price - purchase_costs_investment_total 
-    capital_gains_tax = 0
-    if capital_gain_base > 0:
-        if country == "spain":
-            plusvalia = get_rate(country, city, "selling_plusvalia_municipal") # Placeholder
-            costs["breakdown"]["selling_plusvalia_municipal"] = plusvalia
-            costs["total"] += plusvalia
-            
+    capital_gains = max(0, selling_price - purchase_costs_investment_total)
+    
+    if country == "spain":
+        # Plusvalia municipal (example calculation, actual formula is complex)
+        plusvalia = get_rate(country, city, "selling_plusvalia_municipal")
+        costs["breakdown"]["plusvalia_municipal"] = plusvalia
+        costs["total"] += plusvalia
+        
+        # Capital gains tax
+        if capital_gains > 0:
             if beckham_law_active:
-                # Beckham law might have specific rules for capital gains - assuming standard rates for now
-                cg_tax_rates = get_rate(country, city, "capital_gains_tax_rate_spain")
-                capital_gains_tax = calculate_progressive_tax(capital_gain_base, cg_tax_rates)
+                # Beckham Law - flat rate on capital gains
+                tax_rate = get_rate(country, city, "beckham_law_tax_rate")
+                capital_gains_tax = capital_gains * tax_rate
             else:
-                cg_tax_rates = get_rate(country, city, "capital_gains_tax_rate_spain")
-                capital_gains_tax = calculate_progressive_tax(capital_gain_base, cg_tax_rates)
-            costs["breakdown"]["capital_gains_tax_spain"] = capital_gains_tax
-            costs["total"] += capital_gains_tax
+                # Progressive tax rates
+                rates_table = get_rate(country, city, "capital_gains_tax_rate_spain")
+                capital_gains_tax = calculate_progressive_tax(capital_gains, rates_table)
             
-        elif country == "denmark":
-            # Capital gains tax rules in DK are complex, often 0 for primary residence
-            # Assuming 0 for now, needs refinement based on user status/property use
-            capital_gains_tax = 0 # Placeholder
-            costs["breakdown"]["capital_gains_tax_denmark"] = capital_gains_tax
+            costs["breakdown"]["capital_gains_tax"] = capital_gains_tax
             costs["total"] += capital_gains_tax
-
+    
+    elif country == "denmark":
+        # Capital gains tax (simplified, actual rules are complex)
+        if capital_gains > 0:
+            tax_rate = get_rate(country, city, "capital_gains_tax_rate_denmark")
+            capital_gains_tax = capital_gains * tax_rate
+            costs["breakdown"]["capital_gains_tax"] = capital_gains_tax
+            costs["total"] += capital_gains_tax
+    
     return costs
 
-def calculate_scenario_results(purchase_costs, running_costs, selling_costs, total_interest_paid, inputs, country, city, years):
-    """Calculates the final win/loss for different appreciation scenarios."""
-    results = {}
-    purchase_price = inputs.get("new_flat_price", 0)
-    prop_type = inputs.get("property_type", "new")
-    completion_years = inputs.get("construction_completion_years", 0) if prop_type == "under_construction" else 0
-    effective_years = max(0, years - completion_years)
-    if purchase_price <= 0: return results
+def calculate_renting_scenario_cost(renting_inputs, years_to_sell):
+    """Calculates the total cost of renting over the specified period."""
+    if not renting_inputs:
+        return {"error": "No renting scenario inputs provided"}
+    
+    try:
+        # Extract inputs with defaults
+        monthly_rent = float(renting_inputs.get("monthly_rent", 0))
+        monthly_water = float(renting_inputs.get("monthly_water", 0))
+        monthly_utilities = float(renting_inputs.get("monthly_utilities", 0))
+        monthly_parking = float(renting_inputs.get("monthly_parking", 0))
+        
+        annual_rent_increment = float(renting_inputs.get("annual_rent_increment", 0))
+        annual_water_increment = float(renting_inputs.get("annual_water_increment", 0))
+        annual_utilities_increment = float(renting_inputs.get("annual_utilities_increment", 0))
+        annual_parking_increment = float(renting_inputs.get("annual_parking_increment", 0))
+        
+        if monthly_rent <= 0:
+            return {"error": "Monthly rent must be greater than 0"}
+        
+        if years_to_sell <= 0:
+            return {"error": "Years to sell must be greater than 0"}
+        
+        # Calculate costs with annual increments
+        total_rent = 0
+        total_water = 0
+        total_utilities = 0
+        total_parking = 0
+        
+        # Calculate costs for each year with appropriate increments
+        for year in range(years_to_sell):
+            year_rent = monthly_rent * 12 * ((1 + annual_rent_increment) ** year)
+            year_water = monthly_water * 12 * ((1 + annual_water_increment) ** year)
+            year_utilities = monthly_utilities * 12 * ((1 + annual_utilities_increment) ** year)
+            year_parking = monthly_parking * 12 * ((1 + annual_parking_increment) ** year)
+            
+            total_rent += year_rent
+            total_water += year_water
+            total_utilities += year_utilities
+            total_parking += year_parking
+        
+        total_renting_cost = total_rent + total_water + total_utilities + total_parking
+        
+        # Prepare breakdown of costs
+        breakdown_annual = {
+            "monthly_rent": monthly_rent,
+            "monthly_water": monthly_water,
+            "monthly_utilities": monthly_utilities,
+            "monthly_parking": monthly_parking,
+            "annual_rent": monthly_rent * 12,
+            "annual_water": monthly_water * 12,
+            "annual_utilities": monthly_utilities * 12,
+            "annual_parking": monthly_parking * 12,
+            "annual_total": (monthly_rent + monthly_water + monthly_utilities + monthly_parking) * 12
+        }
+        
+        breakdown_total = {
+            "total_rent": total_rent,
+            "total_water": total_water,
+            "total_utilities": total_utilities,
+            "total_parking": total_parking
+        }
+        
+        return {
+            "total_renting_cost": total_renting_cost,
+            "breakdown_annual": breakdown_annual,
+            "breakdown_total": breakdown_total,
+            "years": years_to_sell
+        }
+        
+    except (ValueError, TypeError) as e:
+        return {"error": f"Error calculating renting costs: {str(e)}"}
 
-    avg_rate = get_rate(country, city, "avg_appreciation_rate")
+def perform_calculation_for_scenario(calculation_input):
+    """Main calculation function that orchestrates all sub-calculations for a scenario."""
+    # Extract inputs
+    personal_finance = calculation_input.get("personal_finance", {})
+    scenario_settings = calculation_input.get("scenario_settings", {})
+    country = calculation_input.get("country", "")
+    city = calculation_input.get("city", "")
+    inputs = calculation_input.get("inputs", {})
+    
+    # Validate essential inputs
+    if not country or not city or not inputs:
+        return {"error": "Missing required inputs (country, city, or property details)"}
+    
+    years_to_sell = scenario_settings.get("years_to_sell", 10)
+    if years_to_sell <= 0:
+        return {"error": "Years to sell must be greater than 0"}
+    
+    price = inputs.get("new_flat_price", 0)
+    if price <= 0:
+        return {"error": "Property price must be greater than 0"}
+    
+    # Calculate purchase costs
+    purchase_costs = calculate_purchase_costs(inputs, country, city)
+    
+    # Calculate running costs over the holding period
+    running_costs = calculate_running_costs(inputs, country, city, years_to_sell)
+    
+    # Calculate loan interest costs if applicable
+    loan_details = inputs.get("loan_details", {})
+    loan_interest_costs = 0
+    if loan_details and loan_details.get("amount", 0) > 0:
+        loan_amount = loan_details.get("amount", 0)
+        interest_rate = loan_details.get("interest_rate", 0)
+        term_years = loan_details.get("term_years", 30)
+        
+        loan_interest_costs = calculate_total_interest_paid(
+            loan_amount, interest_rate, term_years, years_to_sell
+        )
+        loan_details["total_interest_paid"] = loan_interest_costs
+    
+    # Calculate property value at sale time under different scenarios
+    avg_appreciation_rate = get_rate(country, city, "avg_appreciation_rate")
     std_dev = get_rate(country, city, "appreciation_std_dev")
     
-    scenarios = {
-        "average": avg_rate,
-        "low_risk": avg_rate - std_dev,
-        "high_risk": avg_rate + std_dev,
-        "zero_growth": 0.0
+    # Calculate selling values for different scenarios
+    selling_values = {
+        "zero_growth": price,  # No appreciation scenario
+        "avg_growth": calculate_future_value(price, avg_appreciation_rate, years_to_sell),
+        "low_risk": calculate_future_value(price, max(0, avg_appreciation_rate - std_dev), years_to_sell),
+        "high_risk": calculate_future_value(price, avg_appreciation_rate + std_dev, years_to_sell)
     }
-
-    total_investment = purchase_costs["total_investment_cost"]
-    total_running = running_costs["total"]
     
-    for scenario_name, rate in scenarios.items():
-        selling_price = calculate_future_value(purchase_price, rate, effective_years)
+    # Calculate selling costs and capital gains tax for each scenario
+    selling_scenarios = {}
+    beckham_law_active = inputs.get("beckham_law_active", False)
+    
+    # Import the detailed breakdown service
+    from src.services.detailed_breakdown_service import create_detailed_breakdown
+    
+    # Create detailed breakdowns for each scenario
+    detailed_breakdowns = {}
+    
+    for scenario_name, selling_price in selling_values.items():
+        selling_costs = calculate_selling_costs(
+            country, city, selling_price, price, 
+            purchase_costs["total_investment_cost"], 
+            years_to_sell, beckham_law_active
+        )
         
-        # Recalculate selling costs based on the scenario's selling price
-        beckham_active = inputs.get("personal_finance", {}).get("beckham_law_active", False)
-        scenario_selling_costs = calculate_selling_costs(country, city, selling_price, purchase_price, total_investment, years, beckham_active)
-        total_selling = scenario_selling_costs["total"]
+        # Calculate win/loss (profit/loss)
+        win_loss = selling_price - purchase_costs["total_investment_cost"] - running_costs["total"] - loan_interest_costs - selling_costs["total"]
         
-        # Calculate Win/Loss including loan interest
-        win_loss = selling_price - total_investment - total_running - total_selling - total_interest_paid
-        
-        results[scenario_name] = {
+        selling_scenarios[scenario_name] = {
             "selling_price": selling_price,
-            "total_investment_cost": total_investment,
-            "total_running_costs": total_running,
-            "total_loan_interest_paid": total_interest_paid,
-            "total_selling_costs": total_selling,
-            "win_loss": win_loss,
-            "selling_costs_breakdown": scenario_selling_costs["breakdown"]
+            "selling_costs": selling_costs,
+            "win_loss_eur": win_loss
         }
         
-    return results
-
-# --- Main Entry Point --- 
-
-def perform_calculation_for_scenario(data):
-    """Performs the full calculation for a single investment scenario."""
+        # Create detailed breakdown for this scenario
+        detailed_breakdowns[scenario_name] = create_detailed_breakdown(
+            purchase_costs=purchase_costs,
+            running_costs=running_costs,
+            selling_costs=selling_costs,
+            loan_details=loan_details,
+            years_to_sell=years_to_sell,
+            price=price,
+            selling_price=selling_price,
+            win_loss=win_loss
+        )
     
-    # Extract data for the specific scenario
-    personal_finance = data.get("personal_finance", {})
-    scenario_settings = data.get("scenario_settings", {})
-    country = data.get("country")
-    city = data.get("city")
-    inputs = data.get("inputs")
-    
-    if not all([country, city, inputs, scenario_settings]):
-        return {"error": "Missing country, city, inputs, or scenario_settings"}
-
-    years_to_sell = scenario_settings.get("years_to_sell", 10)
-    
-    # 1. Calculate Purchase Costs
-    purchase_costs_result = calculate_purchase_costs(inputs, country, city)
-    
-    # 2. Calculate Running Costs (excluding interest)
-    running_costs_result = calculate_running_costs(inputs, country, city, years_to_sell)
-    
-    # 3. Calculate Total Loan Interest Paid
-    loan_details = inputs.get("loan_details", {})
-    loan_amount = loan_details.get("amount", inputs.get("new_flat_price", 0) * 0.8)
-    loan_rate = loan_details.get("interest_rate", 0.03) # Example default
-    loan_term = loan_details.get("term_years", 30) # Example default
-    total_interest_paid = calculate_total_interest_paid(loan_amount, loan_rate, loan_term, years_to_sell)
-
-    # 4. Calculate Scenario Results (Win/Loss for Avg, Low, High, Zero)
-    # Note: Selling costs are calculated *within* calculate_scenario_results for each appreciation scenario
-    scenario_results = calculate_scenario_results(
-        purchase_costs_result,
-        running_costs_result,
-        {}, # Pass empty dict, selling costs calculated inside
-        total_interest_paid,
-        inputs,
-        country,
-        city,
-        years_to_sell
-    )
-
-    # 5. Consolidate Results
-    final_result = {
-        "inputs_summary": {
-            "country": country,
-            "city": city,
-            "property_type": inputs.get("property_type"),
-            "price": inputs.get("new_flat_price"),
-            "years_held": years_to_sell,
-            "loan_amount": loan_amount,
-            "loan_rate": loan_rate,
-            "loan_term": loan_term,
+    # Prepare the final result
+    result = {
+        "purchase_costs": purchase_costs,
+        "running_costs": running_costs,
+        "loan_interest_costs": loan_interest_costs,
+        "selling_scenarios": selling_scenarios,
+        "overall_summary": {
+            "win_loss_eur": selling_scenarios["avg_growth"]["win_loss_eur"]  # Default to average growth
         },
-        "purchase_costs": purchase_costs_result,
-        "running_costs": running_costs_result,
-        "total_loan_interest_paid_over_hold": total_interest_paid,
-        "scenario_outcomes": scenario_results,
         "calculation_details": {
-            "warnings": list(purchase_costs_result["breakdown"].get("warnings", [])) # Collect warnings
-        }
+            "years_to_sell": years_to_sell,
+            "warnings": []
+        },
+        "detailed_breakdowns": detailed_breakdowns  # Add detailed breakdowns to the result
     }
     
-    # Clean up warnings if present
-    if "warning_no_payment_schedule" in final_result["purchase_costs"]["breakdown"]:
-        final_result["calculation_details"]["warnings"].append(final_result["purchase_costs"]["breakdown"].pop("warning_no_payment_schedule"))
-
-    return final_result
-
-
-
-
-def calculate_renting_scenario_cost(renting_inputs, years_to_sell):
-    """Calculates the total cost of renting over a specified period, with annual increments."""
-    results = {
-        "total_renting_cost": 0,
-        "breakdown_annual": [], # List of dicts, one for each year
-        "inputs_summary": renting_inputs,
-        "warnings": []
-    }
-
-    if not renting_inputs or not isinstance(renting_inputs, dict) or years_to_sell <= 0:
-        results["error"] = "Invalid renting inputs or years_to_sell."
-        return results
-
-    # Get initial monthly costs and annual increments
-    monthly_rent = renting_inputs.get("monthly_rent", 0)
-    monthly_water = renting_inputs.get("monthly_water", 0)
-    monthly_utilities = renting_inputs.get("monthly_utilities", 0)
-    monthly_parking = renting_inputs.get("monthly_parking", 0)
-
-    annual_rent_increment = renting_inputs.get("annual_rent_increment", 0)
-    annual_water_increment = renting_inputs.get("annual_water_increment", 0)
-    annual_utilities_increment = renting_inputs.get("annual_utilities_increment", 0)
-    annual_parking_increment = renting_inputs.get("annual_parking_increment", 0)
-
-    current_annual_rent = monthly_rent * 12
-    current_annual_water = monthly_water * 12
-    current_annual_utilities = monthly_utilities * 12
-    current_annual_parking = monthly_parking * 12
-
-    cumulative_total_cost = 0
-
-    for year in range(1, int(years_to_sell) + 1):
-        year_costs = {
-            "year": year,
-            "rent_cost": current_annual_rent,
-            "water_cost": current_annual_water,
-            "utilities_cost": current_annual_utilities,
-            "parking_cost": current_annual_parking,
-        }
-        
-        annual_cost_for_year = current_annual_rent + current_annual_water + current_annual_utilities + current_annual_parking
-        year_costs["total_annual_cost"] = annual_cost_for_year
-        results["breakdown_annual"].append(year_costs)
-        cumulative_total_cost += annual_cost_for_year
-
-        # Apply increments for the next year
-        current_annual_rent *= (1 + annual_rent_increment)
-        current_annual_water *= (1 + annual_water_increment)
-        current_annual_utilities *= (1 + annual_utilities_increment)
-        current_annual_parking *= (1 + annual_parking_increment)
-        
-    results["total_renting_cost"] = cumulative_total_cost
-    return results
-
-
+    return result

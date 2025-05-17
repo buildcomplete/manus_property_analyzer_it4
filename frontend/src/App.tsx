@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import './App.css'; // Ensure Tailwind is configured via index.css or similar
+import DetailedBreakdownTable from './DetailedBreakdownTable';
 
 // --- Interfaces (Keep or move to types.ts) ---
 
@@ -118,6 +119,14 @@ interface CalculationRequest {
 }
 
 // --- Result Interfaces (Adjusted for Multi-Scenario) ---
+interface DetailedBreakdown {
+    purchase_costs: Record<string, any>;
+    loan_costs: Record<string, any>;
+    running_costs: Record<string, any>;
+    selling_costs: Record<string, any>;
+    outcome: Record<string, any>;
+}
+
 interface SingleScenarioResult {
     inputs_summary: Record<string, any>;
     purchase_costs: { total_investment_cost: number; initial_outlay_year0: number; breakdown: Record<string, any> };
@@ -128,6 +137,13 @@ interface SingleScenarioResult {
         low_risk: { selling_price: number; win_loss: number; index_adjusted_profit_eur?: number; [key: string]: any };
         high_risk: { selling_price: number; win_loss: number; index_adjusted_profit_eur?: number; [key: string]: any };
         zero_growth: { selling_price: number; win_loss: number; index_adjusted_profit_eur?: number; [key: string]: any };
+    };
+    detailed_breakdowns?: {
+        average?: DetailedBreakdown;
+        low_risk?: DetailedBreakdown;
+        high_risk?: DetailedBreakdown;
+        zero_growth?: DetailedBreakdown;
+        [key: string]: DetailedBreakdown | undefined;
     };
     calculation_details?: {
         warnings?: string[];
@@ -899,27 +915,71 @@ function App() {
                                         );
                                     }
                                     const outcomes = scenarioResult.result.scenario_outcomes;
-                                    return resultRowOrder.map((key, index) => (
-                                        <tr key={`${scenarioResult.scenario_id}-${key}`} className={index === 0 ? "border-t-2 border-gray-400" : ""}>
-                                            {index === 0 && (
-                                                <td rowSpan={resultRowOrder.length} className="px-4 py-3 whitespace-nowrap text-sm font-bold text-indigo-700 align-top border-r">
-                                                    {scenarioDetails?.name || scenarioResult.scenario_id}
-                                                </td>
-                                            )}
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{resultRowLabels[key]}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-800 text-right">
-                                                {outcomes[key].selling_price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                            </td>
-                                            <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${outcomes[key].win_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {outcomes[key].win_loss.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                            </td>
-                                            {results.renting_scenario_results && !results.renting_scenario_results.error && (
-                                                <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-semibold ${outcomes[key].index_adjusted_profit_eur !== undefined && outcomes[key].index_adjusted_profit_eur! >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                    {outcomes[key].index_adjusted_profit_eur?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) ?? 'N/A'}
-                                                </td>
-                                            )}
-                                        </tr>
-                                    ));
+                                    // State for tracking which scenarios have expanded detailed breakdowns
+                                    const [expandedScenarios, setExpandedScenarios] = useState<Record<string, boolean>>({});
+                                    
+                                    // Toggle function for expanding/collapsing detailed breakdown
+                                    const toggleDetailedBreakdown = (scenarioId: string, growthKey: string) => {
+                                        const key = `${scenarioId}-${growthKey}`;
+                                        setExpandedScenarios(prev => ({
+                                            ...prev,
+                                            [key]: !prev[key]
+                                        }));
+                                    };
+                                    
+                                    return resultRowOrder.map((key, index) => {
+                                        const scenarioId = scenarioResult.scenario_id || '';
+                                        const expandKey = `${scenarioId}-${key}`;
+                                        const isExpanded = expandedScenarios[expandKey];
+                                        const hasDetailedBreakdown = scenarioResult.result?.detailed_breakdowns?.[key];
+                                        
+                                        return (
+                                            <Fragment key={`${scenarioId}-${key}`}>
+                                                <tr className={index === 0 ? "border-t-2 border-gray-400" : ""}>
+                                                    {index === 0 && (
+                                                        <td rowSpan={resultRowOrder.length} className="px-4 py-3 whitespace-nowrap text-sm font-bold text-indigo-700 align-top border-r">
+                                                            {scenarioDetails?.name || scenarioId}
+                                                        </td>
+                                                    )}
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                                        {resultRowLabels[key]}
+                                                        {hasDetailedBreakdown && (
+                                                            <button 
+                                                                onClick={() => toggleDetailedBreakdown(scenarioId, key)}
+                                                                className="ml-2 text-xs text-indigo-600 hover:text-indigo-800 underline focus:outline-none"
+                                                                title="View detailed breakdown"
+                                                            >
+                                                                {isExpanded ? 'Hide Details' : 'View Details'}
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-800 text-right">
+                                                        {outcomes[key].selling_price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                    </td>
+                                                    <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${outcomes[key].win_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {outcomes[key].win_loss.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                    </td>
+                                                    {results.renting_scenario_results && !results.renting_scenario_results.error && (
+                                                        <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-semibold ${outcomes[key].index_adjusted_profit_eur !== undefined && outcomes[key].index_adjusted_profit_eur! >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                                            {outcomes[key].index_adjusted_profit_eur?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) ?? 'N/A'}
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                                {isExpanded && hasDetailedBreakdown && (
+                                                    <tr>
+                                                        <td colSpan={results.renting_scenario_results && !results.renting_scenario_results.error ? 5 : 4} className="p-0 border-b">
+                                                            <div className="px-4 py-2 bg-gray-50">
+                                                                <DetailedBreakdownTable 
+                                                                    breakdown={scenarioResult.result?.detailed_breakdowns?.[key]} 
+                                                                    currency={currencySymbol} 
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </Fragment>
+                                        );
+                                    });
                                 })}
                             </tbody>
                         </table>

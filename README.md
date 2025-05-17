@@ -1,4 +1,4 @@
-# Property Investment Analysis Tool (v1.5.2)
+# Property Investment Analysis Tool (v1.6.0)
 
 ## Overview
 
@@ -45,7 +45,7 @@ The project follows a monorepo structure:
 
 **Steps:**
 
-1.  **Extract the archive (`property_analyzer_v1.5.1.tar.gz`).**
+1.  **Extract the archive (`property_analyzer_v1.6.0.tar.gz`).**
 2.  **Navigate to the project root directory (`property_analyzer`).**
 3.  **Build and start the services:**
     ```bash
@@ -60,22 +60,26 @@ The project follows a monorepo structure:
 
 The application uses environment variables for flexible deployment:
 
--   **API URL Configuration:** The frontend uses the `VITE_API_URL` environment variable to connect to the backend API.
-    -   In `docker-compose.yml`, this is set to `http://localhost:5000/api` by default.
-    -   For different deployment environments, modify this value in `docker-compose.yml` or provide it at runtime.
+-   **API URL Configuration:** The frontend uses a runtime configuration approach to connect to the backend API.
+    -   In `docker-compose.yml`, set the `VITE_API_URL` environment variable (e.g., `http://localhost:5000/api`).
+    -   The frontend container uses an entrypoint script to inject this value into a runtime config file.
+    -   This approach allows changing the API URL without rebuilding the frontend.
     -   If not specified, the application falls back to a development proxy configuration in `vite.config.ts`.
 
-**Example configurations:**
+**Example configurations in docker-compose.yml:**
 
 ```yaml
 # For local development with Docker
-VITE_API_URL: "http://localhost:5000/api"
+environment:
+  VITE_API_URL: "http://localhost:5000/api"
 
 # For production deployment with a different domain
-VITE_API_URL: "https://api.example.com/api"
+environment:
+  VITE_API_URL: "https://api.example.com/api"
 
 # For internal Docker network communication
-VITE_API_URL: "http://backend:5000/api"
+environment:
+  VITE_API_URL: "http://backend:5000/api"
 ```
 
 ## Development Notes
@@ -102,6 +106,27 @@ VITE_API_URL: "http://backend:5000/api"
 
 
 
+## Key Features (v1.6.0)
+
+Includes all features from v1.5.3, plus:
+
+- **Detailed Cost Breakdown:**
+  - Added expandable detailed breakdown tables for each scenario and growth profile
+  - Provides line-by-line breakdown of all cost items in a clear, elegant format
+  - Organized into logical sections: Purchase Costs, Loan Details, Running Costs, Selling Costs, and Financial Outcome
+  - Designed for both expert analysis and explanations to laypeople
+  - Accessible via "View Details" button for each growth scenario (Zero Growth, Average, Low Risk, High Risk)
+  - Includes subtotals for each cost category and clear financial outcome summary
+
+## Key Features (v1.5.3)
+
+Includes all features from v1.5.2, plus:
+
+- **Runtime API Configuration:** 
+  - Implemented a runtime configuration system for the frontend to properly connect to the backend API
+  - Added an entrypoint script that dynamically updates configuration at container startup
+  - Ensures the frontend can connect to the backend regardless of deployment environment
+
 ## Key Features (v1.5.2)
 
 Includes all features from v1.5.1, plus:
@@ -110,11 +135,5 @@ Includes all features from v1.5.1, plus:
   - Removed unused boilerplate code and files for a leaner, more maintainable codebase
   - Eliminated unnecessary user routes and models that were not used by the application
   - Streamlined backend structure to focus only on the property investment analysis functionality
-
-## Key Features (v1.5.1)
-
-Includes all features from v1.5, plus:
-
-- **Loan Helper Button:** Added "Set to 80%" helper button next to the loan amount field for quick standard loan-to-value ratio setting
 - **API URL Environment Variable:** Frontend now uses `VITE_API_URL` environment variable for flexible deployment
 - **Backend Robustness:** Improved error handling to ensure calculation results are always properly structured
