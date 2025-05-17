@@ -159,6 +159,23 @@ interface BackendResponse {
     error?: string;
 }
 
+// --- Loan Payback Schedule Interface ---
+interface LoanPaymentItem {
+    payment_number: number;
+    payment_date: string;
+    payment_amount: number;
+    principal_payment: number;
+    interest_payment: number;
+    remaining_balance: number;
+}
+
+interface LoanPaybackSchedule {
+    monthly_payment: number;
+    total_payments: number;
+    total_interest: number;
+    total_principal: number;
+    payments: LoanPaymentItem[];
+}
 
 // --- Helper Components (Placeholder - Implement with shadcn/ui later) ---
 
@@ -329,6 +346,180 @@ const PaymentScheduleInput = ({ schedule, onChange }: { schedule: PaymentSchedul
             <p className={`text-xs mt-2 ${Math.abs(totalPercentage - 1.0) > 0.001 ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
                 Total Percentage: {(totalPercentage * 100).toFixed(1)}%
             </p>
+        </div>
+    );
+};
+
+// --- Loan Payback Schedule Component ---
+const LoanPaybackScheduleTable = ({ loanDetails, currency }: { loanDetails: LoanDetails, currency: string }) => {
+    const [schedule, setSchedule] = useState<LoanPaybackSchedule | null>(null);
+    const [showFullSchedule, setShowFullSchedule] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const calculateSchedule = () => {
+        if (!loanDetails.amount || !loanDetails.interest_rate || !loanDetails.term_years) {
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            const loanAmount = loanDetails.amount;
+            const annualRate = loanDetails.interest_rate;
+            const termYears = loanDetails.term_years;
+            
+            // Calculate monthly interest rate
+            const monthlyRate = annualRate / 12;
+            
+            // Calculate total number of payments
+            const totalPayments = termYears * 12;
+            
+            // Calculate monthly payment using the formula: P = L[c(1 + c)^n]/[(1 + c)^n - 1]
+            // Where P = payment, L = loan amount, c = monthly interest rate, n = total number of payments
+            const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+            
+            // Generate amortization schedule
+            let remainingBalance = loanAmount;
+            let totalInterest = 0;
+            let totalPrincipal = 0;
+            
+            const payments: LoanPaymentItem[] = [];
+            
+            for (let i = 1; i <= totalPayments; i++) {
+                // Calculate interest for this period
+                const interestPayment = remainingBalance * monthlyRate;
+                
+                // Calculate principal for this period
+                const principalPayment = monthlyPayment - interestPayment;
+                
+                // Update remaining balance
+                remainingBalance -= principalPayment;
+                
+                // Update totals
+                totalInterest += interestPayment;
+                totalPrincipal += principalPayment;
+                
+                // Calculate payment date
+                const currentDate = new Date();
+                currentDate.setMonth(currentDate.getMonth() + i);
+                const paymentDate = currentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+                
+                // Add payment to schedule
+                payments.push({
+                    payment_number: i,
+                    payment_date: paymentDate,
+                    payment_amount: monthlyPayment,
+                    principal_payment: principalPayment,
+                    interest_payment: interestPayment,
+                    remaining_balance: Math.max(0, remainingBalance) // Ensure we don't show negative balance due to rounding
+                });
+            }
+            
+            setSchedule({
+                monthly_payment: monthlyPayment,
+                total_payments: totalPayments,
+                total_interest: totalInterest,
+                total_principal: totalPrincipal,
+                payments
+            });
+        } catch (error) {
+            console.error("Error calculating loan schedule:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Display a limited number of payments initially
+    const displayedPayments = showFullSchedule ? schedule?.payments : schedule?.payments.slice(0, 12);
+
+    return (
+        <div className="mt-4 p-4 border rounded-md bg-gray-50">
+            <h3 className="text-lg font-semibold mb-4">Loan Payback Schedule</h3>
+            
+            {!schedule && (
+                <div className="text-center">
+                    <button 
+                        onClick={calculateSchedule}
+                        disabled={isLoading || !loanDetails.amount || !loanDetails.interest_rate || !loanDetails.term_years}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? 'Calculating...' : 'Calculate Loan Schedule'}
+                    </button>
+                    {(!loanDetails.amount || !loanDetails.interest_rate || !loanDetails.term_years) && (
+                        <p className="mt-2 text-sm text-red-500">Please fill in all loan details (amount, interest rate, term) to calculate the schedule.</p>
+                    )}
+                </div>
+            )}
+            
+            {schedule && (
+                <div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div className="p-3 bg-white rounded border">
+                            <h4 className="font-medium text-gray-700">Monthly Payment</h4>
+                            <p className="text-xl font-bold text-indigo-700">{currency}{schedule.monthly_payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        </div>
+                        <div className="p-3 bg-white rounded border">
+                            <h4 className="font-medium text-gray-700">Total Interest</h4>
+                            <p className="text-xl font-bold text-indigo-700">{currency}{schedule.total_interest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 border">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase">Payment #</th>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Payment</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Principal</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Interest</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Remaining</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {displayedPayments?.map((payment) => (
+                                    <tr key={payment.payment_number} className={payment.payment_number % 2 === 0 ? 'bg-gray-50' : ''}>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">{payment.payment_number}</td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">{payment.payment_date}</td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 text-right">
+                                            {currency}{payment.payment_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-green-600 text-right">
+                                            {currency}{payment.principal_payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-red-600 text-right">
+                                            {currency}{payment.interest_payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 text-right">
+                                            {currency}{payment.remaining_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {schedule.payments.length > 12 && (
+                        <div className="mt-4 text-center">
+                            <button 
+                                onClick={() => setShowFullSchedule(!showFullSchedule)}
+                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                            >
+                                {showFullSchedule ? 'Show Less' : `Show All ${schedule.payments.length} Payments`}
+                            </button>
+                        </div>
+                    )}
+                    
+                    <div className="mt-4 text-center">
+                        <button 
+                            onClick={() => setSchedule(null)}
+                            className="px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                        >
+                            Reset Schedule
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -623,6 +814,10 @@ const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: S
             {/* Renovations are always available */}
             <RenovationInput renovations={scenario.renovations} onChange={handleRenovationChange} currency={currency} />
 
+            {/* Loan Payback Schedule */}
+            {scenario.loan_details?.amount && scenario.loan_details?.interest_rate && scenario.loan_details?.term_years && (
+                <LoanPaybackScheduleTable loanDetails={scenario.loan_details} currency={currency} />
+            )}
         </div>
     );
 };
@@ -795,6 +990,9 @@ function App() {
             // Create a mapped structure for scenario outcomes
             const mappedOutcomes: any = {};
             
+            // Get renting cost for index adjustment
+            const rentingCost = results?.renting_scenario_results?.total_renting_cost || 0;
+            
             // Map selling scenarios to expected frontend keys
             if (result.selling_scenarios) {
                 // Map 'avg_growth' to 'average'
@@ -802,7 +1000,8 @@ function App() {
                     mappedOutcomes.average = {
                         selling_price: result.selling_scenarios.avg_growth.selling_price,
                         win_loss: result.selling_scenarios.avg_growth.win_loss_eur,
-                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                        // Calculate index adjusted profit for each growth profile individually
+                        index_adjusted_profit_eur: result.selling_scenarios.avg_growth.win_loss_eur - rentingCost
                     };
                 }
                 
@@ -811,7 +1010,8 @@ function App() {
                     mappedOutcomes.zero_growth = {
                         selling_price: result.selling_scenarios.zero_growth.selling_price,
                         win_loss: result.selling_scenarios.zero_growth.win_loss_eur,
-                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                        // Calculate index adjusted profit for each growth profile individually
+                        index_adjusted_profit_eur: result.selling_scenarios.zero_growth.win_loss_eur - rentingCost
                     };
                 }
                 
@@ -819,7 +1019,8 @@ function App() {
                     mappedOutcomes.low_risk = {
                         selling_price: result.selling_scenarios.low_risk.selling_price,
                         win_loss: result.selling_scenarios.low_risk.win_loss_eur,
-                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                        // Calculate index adjusted profit for each growth profile individually
+                        index_adjusted_profit_eur: result.selling_scenarios.low_risk.win_loss_eur - rentingCost
                     };
                 }
                 
@@ -827,7 +1028,8 @@ function App() {
                     mappedOutcomes.high_risk = {
                         selling_price: result.selling_scenarios.high_risk.selling_price,
                         win_loss: result.selling_scenarios.high_risk.win_loss_eur,
-                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                        // Calculate index adjusted profit for each growth profile individually
+                        index_adjusted_profit_eur: result.selling_scenarios.high_risk.win_loss_eur - rentingCost
                     };
                 }
             }
