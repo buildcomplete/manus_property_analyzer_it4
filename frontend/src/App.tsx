@@ -156,6 +156,13 @@ interface BackendResponse {
     results_by_scenario: { scenario_id: string | null; result?: SingleScenarioResult; error?: string }[];
     renting_scenario_results?: RentingScenarioResults; // Optional renting results
     global_warnings: string[];
+    growth_rates?: {
+        zero_growth: number;
+        avg_growth: number;
+        low_risk: number;
+        high_risk: number;
+        [key: string]: number;
+    };
     error?: string;
 }
 
