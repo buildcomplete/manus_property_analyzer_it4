@@ -1,6 +1,7 @@
 import { useState, Fragment } from 'react';
 import './App.css'; // Ensure Tailwind is configured via index.css or similar
 import DetailedBreakdownTable from './DetailedBreakdownTable';
+import ErrorBoundary from './ErrorBoundary';
 
 // --- Interfaces (Keep or move to types.ts) ---
 
@@ -914,7 +915,89 @@ function App() {
                                             </tr>
                                         );
                                     }
-                                    const outcomes = scenarioResult.result.scenario_outcomes;
+                                    
+                                    // Map backend keys to frontend expected keys
+                                    const mapBackendToFrontendKeys = (result: any) => {
+                                        try {
+                                            // Create a mapped structure for scenario outcomes
+                                            const mappedOutcomes: any = {};
+                                            
+                                            // Map selling scenarios to expected frontend keys
+                                            if (result.selling_scenarios) {
+                                                // Map 'avg_growth' to 'average'
+                                                if (result.selling_scenarios.avg_growth) {
+                                                    mappedOutcomes.average = {
+                                                        selling_price: result.selling_scenarios.avg_growth.selling_price,
+                                                        win_loss: result.selling_scenarios.avg_growth.win_loss_eur,
+                                                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                                                    };
+                                                }
+                                                
+                                                // Map other keys (these already match)
+                                                if (result.selling_scenarios.zero_growth) {
+                                                    mappedOutcomes.zero_growth = {
+                                                        selling_price: result.selling_scenarios.zero_growth.selling_price,
+                                                        win_loss: result.selling_scenarios.zero_growth.win_loss_eur,
+                                                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                                                    };
+                                                }
+                                                
+                                                if (result.selling_scenarios.low_risk) {
+                                                    mappedOutcomes.low_risk = {
+                                                        selling_price: result.selling_scenarios.low_risk.selling_price,
+                                                        win_loss: result.selling_scenarios.low_risk.win_loss_eur,
+                                                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                                                    };
+                                                }
+                                                
+                                                if (result.selling_scenarios.high_risk) {
+                                                    mappedOutcomes.high_risk = {
+                                                        selling_price: result.selling_scenarios.high_risk.selling_price,
+                                                        win_loss: result.selling_scenarios.high_risk.win_loss_eur,
+                                                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                                                    };
+                                                }
+                                            }
+                                            
+                                            // Map detailed breakdowns
+                                            const mappedDetailedBreakdowns: any = {};
+                                            if (result.detailed_breakdowns) {
+                                                // Map 'avg_growth' to 'average'
+                                                if (result.detailed_breakdowns.avg_growth) {
+                                                    mappedDetailedBreakdowns.average = result.detailed_breakdowns.avg_growth;
+                                                }
+                                                
+                                                // Copy other keys (these already match)
+                                                if (result.detailed_breakdowns.zero_growth) {
+                                                    mappedDetailedBreakdowns.zero_growth = result.detailed_breakdowns.zero_growth;
+                                                }
+                                                
+                                                if (result.detailed_breakdowns.low_risk) {
+                                                    mappedDetailedBreakdowns.low_risk = result.detailed_breakdowns.low_risk;
+                                                }
+                                                
+                                                if (result.detailed_breakdowns.high_risk) {
+                                                    mappedDetailedBreakdowns.high_risk = result.detailed_breakdowns.high_risk;
+                                                }
+                                            }
+                                            
+                                            // Add mapped structures to result
+                                            result.scenario_outcomes = mappedOutcomes;
+                                            result.mapped_detailed_breakdowns = mappedDetailedBreakdowns;
+                                            
+                                            return result;
+                                        } catch (error) {
+                                            console.error("Error mapping backend keys to frontend:", error);
+                                            return result; // Return original result if mapping fails
+                                        }
+                                    };
+                                    
+                                    // Map backend keys to frontend expected keys
+                                    const mappedResult = mapBackendToFrontendKeys(scenarioResult.result);
+                                    
+                                    // Use mapped result
+                                    const outcomes = mappedResult.scenario_outcomes || {};
+                                    
                                     // State for tracking which scenarios have expanded detailed breakdowns
                                     const [expandedScenarios, setExpandedScenarios] = useState<Record<string, boolean>>({});
                                     
@@ -928,10 +1011,20 @@ function App() {
                                     };
                                     
                                     return resultRowOrder.map((key, index) => {
+                                        // Skip if this outcome doesn't exist
+                                        if (!outcomes[key]) {
+                                            console.warn(`Missing outcome for key: ${key}`);
+                                            return null;
+                                        }
+                                        
                                         const scenarioId = scenarioResult.scenario_id || '';
                                         const expandKey = `${scenarioId}-${key}`;
                                         const isExpanded = expandedScenarios[expandKey];
-                                        const hasDetailedBreakdown = scenarioResult.result?.detailed_breakdowns?.[key];
+                                        
+                                        // Map key for detailed breakdowns (average -> avg_growth)
+                                        const detailedBreakdownKey = key === 'average' ? 'avg_growth' : key;
+                                        const hasDetailedBreakdown = mappedResult.mapped_detailed_breakdowns?.[key] || 
+                                                                    scenarioResult.result?.detailed_breakdowns?.[detailedBreakdownKey];
                                         
                                         return (
                                             <Fragment key={`${scenarioId}-${key}`}>
@@ -954,14 +1047,14 @@ function App() {
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-800 text-right">
-                                                        {outcomes[key].selling_price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                        {outcomes[key]?.selling_price?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || 'N/A'}
                                                     </td>
-                                                    <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${outcomes[key].win_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {outcomes[key].win_loss.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                    <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${outcomes[key]?.win_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {outcomes[key]?.win_loss?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || 'N/A'}
                                                     </td>
                                                     {results.renting_scenario_results && !results.renting_scenario_results.error && (
-                                                        <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-semibold ${outcomes[key].index_adjusted_profit_eur !== undefined && outcomes[key].index_adjusted_profit_eur! >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                            {outcomes[key].index_adjusted_profit_eur?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) ?? 'N/A'}
+                                                        <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-semibold ${outcomes[key]?.index_adjusted_profit_eur !== undefined && outcomes[key]?.index_adjusted_profit_eur! >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                                            {outcomes[key]?.index_adjusted_profit_eur?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) ?? 'N/A'}
                                                         </td>
                                                     )}
                                                 </tr>
@@ -969,17 +1062,20 @@ function App() {
                                                     <tr>
                                                         <td colSpan={results.renting_scenario_results && !results.renting_scenario_results.error ? 5 : 4} className="p-0 border-b">
                                                             <div className="px-4 py-2 bg-gray-50">
-                                                                <DetailedBreakdownTable 
-                                                                    breakdown={scenarioResult.result?.detailed_breakdowns?.[key]} 
-                                                                    currency={currencySymbol} 
-                                                                />
+                                                                <ErrorBoundary>
+                                                                    <DetailedBreakdownTable 
+                                                                        breakdown={mappedResult.mapped_detailed_breakdowns?.[key] || 
+                                                                                scenarioResult.result?.detailed_breakdowns?.[detailedBreakdownKey]} 
+                                                                        currency={currencySymbol} 
+                                                                    />
+                                                                </ErrorBoundary>
                                                             </div>
                                                         </td>
                                                     </tr>
                                                 )}
                                             </Fragment>
                                         );
-                                    });
+                                    }).filter(Boolean); // Filter out null entries
                                 })}
                             </tbody>
                         </table>
