@@ -1001,7 +1001,8 @@ function App() {
                         selling_price: result.selling_scenarios.avg_growth.selling_price,
                         win_loss: result.selling_scenarios.avg_growth.win_loss_eur,
                         // Calculate index adjusted profit for each growth profile individually
-                        index_adjusted_profit_eur: result.selling_scenarios.avg_growth.win_loss_eur - rentingCost
+                        // ADD renting cost to raw profit (not subtract) as this represents avoided cost
+                        index_adjusted_profit_eur: result.selling_scenarios.avg_growth.win_loss_eur + rentingCost
                     };
                 }
                 
@@ -1011,7 +1012,8 @@ function App() {
                         selling_price: result.selling_scenarios.zero_growth.selling_price,
                         win_loss: result.selling_scenarios.zero_growth.win_loss_eur,
                         // Calculate index adjusted profit for each growth profile individually
-                        index_adjusted_profit_eur: result.selling_scenarios.zero_growth.win_loss_eur - rentingCost
+                        // ADD renting cost to raw profit (not subtract) as this represents avoided cost
+                        index_adjusted_profit_eur: result.selling_scenarios.zero_growth.win_loss_eur + rentingCost
                     };
                 }
                 
@@ -1020,7 +1022,8 @@ function App() {
                         selling_price: result.selling_scenarios.low_risk.selling_price,
                         win_loss: result.selling_scenarios.low_risk.win_loss_eur,
                         // Calculate index adjusted profit for each growth profile individually
-                        index_adjusted_profit_eur: result.selling_scenarios.low_risk.win_loss_eur - rentingCost
+                        // ADD renting cost to raw profit (not subtract) as this represents avoided cost
+                        index_adjusted_profit_eur: result.selling_scenarios.low_risk.win_loss_eur + rentingCost
                     };
                 }
                 
@@ -1029,7 +1032,8 @@ function App() {
                         selling_price: result.selling_scenarios.high_risk.selling_price,
                         win_loss: result.selling_scenarios.high_risk.win_loss_eur,
                         // Calculate index adjusted profit for each growth profile individually
-                        index_adjusted_profit_eur: result.selling_scenarios.high_risk.win_loss_eur - rentingCost
+                        // ADD renting cost to raw profit (not subtract) as this represents avoided cost
+                        index_adjusted_profit_eur: result.selling_scenarios.high_risk.win_loss_eur + rentingCost
                     };
                 }
             }
