@@ -363,141 +363,155 @@ const RentingScenarioInputSection = ({ inputs, onChange, currency }: { inputs: R
                     label="Annual Rent Increment (%)"
                     value={inputs.annual_rent_increment !== undefined ? inputs.annual_rent_increment * 100 : ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_rent_increment', e.target.value)}
-                    placeholder="e.g., 2 for 2%"
-                    tooltip="Expected annual percentage increase in rent."
-                    min="0"
+                    placeholder="e.g., 2"
+                    tooltip="Annual percentage increase in rent (e.g., 2 for 2%)."
                 />
                 <InputField
                     label={`Monthly Water (${currency})`}
                     value={inputs.monthly_water}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_water', e.target.value)}
                     placeholder="e.g., 50"
-                    tooltip="Estimated monthly cost for water."
+                    tooltip="Your estimated monthly water bill."
                 />
                 <InputField
                     label="Annual Water Increment (%)"
                     value={inputs.annual_water_increment !== undefined ? inputs.annual_water_increment * 100 : ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_water_increment', e.target.value)}
-                    placeholder="e.g., 1 for 1%"
-                    tooltip="Expected annual percentage increase in water costs."
-                    min="0"
+                    placeholder="e.g., 1"
+                    tooltip="Annual percentage increase in water costs (e.g., 1 for 1%)."
                 />
                 <InputField
                     label={`Monthly Utilities (${currency})`}
                     value={inputs.monthly_utilities}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_utilities', e.target.value)}
-                    placeholder="e.g., 150"
-                    tooltip="Estimated monthly cost for utilities (electricity, gas, internet, etc.)."
+                    placeholder="e.g., 100"
+                    tooltip="Your estimated monthly utilities (electricity, gas, etc.)."
                 />
                 <InputField
                     label="Annual Utilities Increment (%)"
                     value={inputs.annual_utilities_increment !== undefined ? inputs.annual_utilities_increment * 100 : ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_utilities_increment', e.target.value)}
-                    placeholder="e.g., 1.5 for 1.5%"
-                    tooltip="Expected annual percentage increase in utility costs."
-                    min="0"
+                    placeholder="e.g., 1"
+                    tooltip="Annual percentage increase in utilities costs (e.g., 1 for 1%)."
                 />
                 <InputField
                     label={`Monthly Parking (${currency})`}
                     value={inputs.monthly_parking}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_parking', e.target.value)}
-                    placeholder="e.g., 100"
-                    tooltip="Estimated monthly cost for parking, if applicable."
+                    placeholder="e.g., 75"
+                    tooltip="Your estimated monthly parking costs (if applicable)."
                 />
                 <InputField
                     label="Annual Parking Increment (%)"
                     value={inputs.annual_parking_increment !== undefined ? inputs.annual_parking_increment * 100 : ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_parking_increment', e.target.value)}
-                    placeholder="e.g., 1 for 1%"
-                    tooltip="Expected annual percentage increase in parking costs."
-                    min="0"
+                    placeholder="e.g., 1"
+                    tooltip="Annual percentage increase in parking costs (e.g., 1 for 1%)."
                 />
             </div>
         </div>
     );
 };
 
-
 // --- Scenario Input Component ---
-const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: ScenarioInputsState, onChange: (updatedScenario: ScenarioInputsState) => void, onRemove: () => void, currency: string }) => {
-
-    const handleInputChange = (field: keyof Omit<ScenarioInputsState, 'id' | 'name' | 'renovations' | 'payment_schedule' | 'loan_details'>, value: any) => {
-        onChange({ ...scenario, [field]: value });
-    };
-
-    const handleNestedChange = (section: 'loan_details', field: keyof LoanDetails, value: any) => {
-        const numValue = typeof value === 'string' ? parseFloat(value) : value;
-        onChange({ ...scenario, [section]: { ...(scenario[section] || {}), [field]: isNaN(numValue) ? undefined : numValue } });
-    };
-
-    const handleRenovationChange = (renos: RenovationItem[]) => {
-        onChange({ ...scenario, renovations: renos });
-    };
-
-    const handlePaymentScheduleChange = (schedule: PaymentScheduleItem[]) => {
-        onChange({ ...scenario, payment_schedule: schedule });
-    };
-
-    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onChange({ ...scenario, name: e.target.value });
-    };
-
+const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: ScenarioInputsState, onChange: (updatedData: ScenarioInputsState) => void, onRemove: () => void, currency: string }) => {
+    // Options for dropdowns
     const countryOptions = [
         { value: 'spain', label: 'Spain' },
         { value: 'denmark', label: 'Denmark' },
     ];
-
-    const cityOptions = scenario.country === 'spain' ? [{ value: 'barcelona', label: 'Barcelona' }] : [{ value: 'copenhagen', label: 'Copenhagen' }];
-
-    const propertyTypeOptions = scenario.country === 'spain' ? [
-        { value: 'new', label: 'New Build' },
-        { value: 'second_hand', label: 'Second Hand' },
-        { value: 'under_construction', label: 'Under Construction' },
-    ] : [
-        { value: 'ejer', label: 'Ejerlejlighed (Owner Flat)' },
-        { value: 'andels', label: 'Andelslejlighed (Cooperative Flat)' },
-        { value: 'new', label: 'New Build' }, // Keep new/under_construction for DK too
+    
+    const cityOptions = {
+        spain: [{ value: 'barcelona', label: 'Barcelona' }],
+        denmark: [{ value: 'copenhagen', label: 'Copenhagen' }],
+    };
+    
+    const propertyTypeOptions = [
+        { value: 'new', label: 'New Construction (Completed)' },
+        { value: 'second_hand', label: 'Second-Hand' },
         { value: 'under_construction', label: 'Under Construction' },
     ];
-
+    
+    if (scenario.country === 'denmark') {
+        propertyTypeOptions.push({ value: 'ejer', label: 'Ejer Lejlighed' });
+        propertyTypeOptions.push({ value: 'andels', label: 'Andels Lejlighed' });
+    }
+    
     const loanTypeOptions = [
-        { value: 'standard', label: 'Standard Mortgage' },
-        { value: 'andels_laan', label: 'Andelslån (Cooperative Loan)' },
+        { value: 'standard', label: 'Standard Loan' },
+        { value: 'andels_laan', label: 'Andels Lån' },
     ];
+
+    // Handle input changes
+    const handleInputChange = (field: keyof ScenarioInputsState, value: any) => {
+        const updatedScenario = { ...scenario, [field]: value };
+        
+        // Special handling for country changes
+        if (field === 'country') {
+            // Reset city to first option of new country
+            updatedScenario.city = cityOptions[value as 'spain' | 'denmark'][0].value;
+            
+            // Reset property type if it's Denmark-specific and switching to Spain
+            if (value === 'spain' && (scenario.property_type === 'ejer' || scenario.property_type === 'andels')) {
+                updatedScenario.property_type = 'new';
+            }
+        }
+        
+        onChange(updatedScenario);
+    };
+    
+    const handleNestedChange = (parentField: keyof ScenarioInputsState, childField: string, value: any) => {
+        // Handle nested objects like loan_details
+        const parentValue = scenario[parentField] as Record<string, any> || {};
+        const updatedParent = { ...parentValue, [childField]: parseFloat(value) || undefined };
+        handleInputChange(parentField, updatedParent);
+    };
+    
+    const handleRenovationChange = (renovations: RenovationItem[]) => {
+        handleInputChange('renovations', renovations);
+    };
+    
+    const handlePaymentScheduleChange = (schedule: PaymentScheduleItem[]) => {
+        handleInputChange('payment_schedule', schedule);
+    };
 
     return (
-        <div className="p-4 border border-gray-200 rounded-lg mb-4 bg-white shadow-sm">
+        <div className="p-6 bg-white rounded-lg shadow-md">
             <div className="flex justify-between items-center mb-4">
-                <input
-                    type="text"
-                    value={scenario.name}
-                    onChange={handleNameChange}
-                    className="text-lg font-semibold border-b-2 border-transparent focus:border-indigo-500 outline-none"
-                />
-                <button onClick={onRemove} className="text-sm text-red-600 hover:text-red-800">Remove Scenario</button>
+                <div className="flex items-center space-x-4">
+                    <input
+                        type="text"
+                        value={scenario.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Scenario Name"
+                    />
+                </div>
+                <button
+                    onClick={onRemove}
+                    className="text-red-500 hover:text-red-700 px-3 py-1 border border-red-300 rounded-md hover:bg-red-50"
+                    title="Remove this scenario"
+                >
+                    Remove
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Column 1 */}
                 <div>
                     <SelectField
                         label="Country"
                         value={scenario.country}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                            const newCountry = e.target.value as 'spain' | 'denmark';
-                            const newCity = newCountry === 'spain' ? 'barcelona' : 'copenhagen';
-                            const newType = newCountry === 'spain' ? 'new' : 'ejer'; // Default type change
-                            onChange({ ...scenario, country: newCountry, city: newCity, property_type: newType });
-                        }}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('country', e.target.value)}
                         options={countryOptions}
-                        tooltip="Select the country for this scenario."
+                        tooltip="Select the country where the property is located."
                     />
                     <SelectField
                         label="City"
                         value={scenario.city}
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('city', e.target.value)}
-                        options={cityOptions}
-                        tooltip="Select the city (currently fixed based on country)."
+                        options={cityOptions[scenario.country]}
+                        tooltip="Select the city where the property is located."
                         disabled // Disable city selection for now as it's fixed
                     />
                     <SelectField
@@ -625,6 +639,8 @@ function App() {
     const [results, setResults] = useState<BackendResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // State for tracking which scenarios have expanded detailed breakdowns
+    const [expandedScenarios, setExpandedScenarios] = useState<Record<string, boolean>>({});
 
     const handlePersonalFinanceChange = (field: keyof PersonalFinanceInputs, value: any) => {
         setPersonalFinance(prev => ({ ...prev, [field]: parseFloat(value) || undefined }));
@@ -737,6 +753,7 @@ function App() {
                 throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
             }
             const data: BackendResponse = await response.json();
+            console.log("API Response:", data); // Debug log
             setResults(data);
         } catch (err: any) {
             setError(err.message || 'Failed to fetch results.');
@@ -744,6 +761,15 @@ function App() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Toggle function for expanding/collapsing detailed breakdown
+    const toggleDetailedBreakdown = (scenarioId: string, growthKey: string) => {
+        const key = `${scenarioId}-${growthKey}`;
+        setExpandedScenarios(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
     };
 
     const activeScenario = scenarios.find(sc => sc.id === activeTab);
@@ -757,6 +783,86 @@ function App() {
         average: 'Average Growth',
         low_risk: 'Low Risk (Pessimistic)',
         high_risk: 'High Risk (Optimistic)',
+    };
+
+    // Map backend keys to frontend expected keys
+    const mapBackendToFrontendKeys = (result: any) => {
+        if (!result) return result;
+        
+        try {
+            console.log("Mapping backend keys for result:", result);
+            
+            // Create a mapped structure for scenario outcomes
+            const mappedOutcomes: any = {};
+            
+            // Map selling scenarios to expected frontend keys
+            if (result.selling_scenarios) {
+                // Map 'avg_growth' to 'average'
+                if (result.selling_scenarios.avg_growth) {
+                    mappedOutcomes.average = {
+                        selling_price: result.selling_scenarios.avg_growth.selling_price,
+                        win_loss: result.selling_scenarios.avg_growth.win_loss_eur,
+                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                    };
+                }
+                
+                // Map other keys (these already match)
+                if (result.selling_scenarios.zero_growth) {
+                    mappedOutcomes.zero_growth = {
+                        selling_price: result.selling_scenarios.zero_growth.selling_price,
+                        win_loss: result.selling_scenarios.zero_growth.win_loss_eur,
+                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                    };
+                }
+                
+                if (result.selling_scenarios.low_risk) {
+                    mappedOutcomes.low_risk = {
+                        selling_price: result.selling_scenarios.low_risk.selling_price,
+                        win_loss: result.selling_scenarios.low_risk.win_loss_eur,
+                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                    };
+                }
+                
+                if (result.selling_scenarios.high_risk) {
+                    mappedOutcomes.high_risk = {
+                        selling_price: result.selling_scenarios.high_risk.selling_price,
+                        win_loss: result.selling_scenarios.high_risk.win_loss_eur,
+                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
+                    };
+                }
+            }
+            
+            // Map detailed breakdowns
+            const mappedDetailedBreakdowns: any = {};
+            if (result.detailed_breakdowns) {
+                // Map 'avg_growth' to 'average'
+                if (result.detailed_breakdowns.avg_growth) {
+                    mappedDetailedBreakdowns.average = result.detailed_breakdowns.avg_growth;
+                }
+                
+                // Copy other keys (these already match)
+                if (result.detailed_breakdowns.zero_growth) {
+                    mappedDetailedBreakdowns.zero_growth = result.detailed_breakdowns.zero_growth;
+                }
+                
+                if (result.detailed_breakdowns.low_risk) {
+                    mappedDetailedBreakdowns.low_risk = result.detailed_breakdowns.low_risk;
+                }
+                
+                if (result.detailed_breakdowns.high_risk) {
+                    mappedDetailedBreakdowns.high_risk = result.detailed_breakdowns.high_risk;
+                }
+            }
+            
+            // Add mapped structures to result
+            result.scenario_outcomes = mappedOutcomes;
+            result.mapped_detailed_breakdowns = mappedDetailedBreakdowns;
+            
+            return result;
+        } catch (error) {
+            console.error("Error mapping backend keys to frontend:", error);
+            return result; // Return original result if mapping fails
+        }
     };
 
     return (
@@ -917,98 +1023,10 @@ function App() {
                                     }
                                     
                                     // Map backend keys to frontend expected keys
-                                    const mapBackendToFrontendKeys = (result: any) => {
-                                        try {
-                                            // Create a mapped structure for scenario outcomes
-                                            const mappedOutcomes: any = {};
-                                            
-                                            // Map selling scenarios to expected frontend keys
-                                            if (result.selling_scenarios) {
-                                                // Map 'avg_growth' to 'average'
-                                                if (result.selling_scenarios.avg_growth) {
-                                                    mappedOutcomes.average = {
-                                                        selling_price: result.selling_scenarios.avg_growth.selling_price,
-                                                        win_loss: result.selling_scenarios.avg_growth.win_loss_eur,
-                                                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
-                                                    };
-                                                }
-                                                
-                                                // Map other keys (these already match)
-                                                if (result.selling_scenarios.zero_growth) {
-                                                    mappedOutcomes.zero_growth = {
-                                                        selling_price: result.selling_scenarios.zero_growth.selling_price,
-                                                        win_loss: result.selling_scenarios.zero_growth.win_loss_eur,
-                                                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
-                                                    };
-                                                }
-                                                
-                                                if (result.selling_scenarios.low_risk) {
-                                                    mappedOutcomes.low_risk = {
-                                                        selling_price: result.selling_scenarios.low_risk.selling_price,
-                                                        win_loss: result.selling_scenarios.low_risk.win_loss_eur,
-                                                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
-                                                    };
-                                                }
-                                                
-                                                if (result.selling_scenarios.high_risk) {
-                                                    mappedOutcomes.high_risk = {
-                                                        selling_price: result.selling_scenarios.high_risk.selling_price,
-                                                        win_loss: result.selling_scenarios.high_risk.win_loss_eur,
-                                                        index_adjusted_profit_eur: result.overall_summary?.index_adjusted_profit_eur
-                                                    };
-                                                }
-                                            }
-                                            
-                                            // Map detailed breakdowns
-                                            const mappedDetailedBreakdowns: any = {};
-                                            if (result.detailed_breakdowns) {
-                                                // Map 'avg_growth' to 'average'
-                                                if (result.detailed_breakdowns.avg_growth) {
-                                                    mappedDetailedBreakdowns.average = result.detailed_breakdowns.avg_growth;
-                                                }
-                                                
-                                                // Copy other keys (these already match)
-                                                if (result.detailed_breakdowns.zero_growth) {
-                                                    mappedDetailedBreakdowns.zero_growth = result.detailed_breakdowns.zero_growth;
-                                                }
-                                                
-                                                if (result.detailed_breakdowns.low_risk) {
-                                                    mappedDetailedBreakdowns.low_risk = result.detailed_breakdowns.low_risk;
-                                                }
-                                                
-                                                if (result.detailed_breakdowns.high_risk) {
-                                                    mappedDetailedBreakdowns.high_risk = result.detailed_breakdowns.high_risk;
-                                                }
-                                            }
-                                            
-                                            // Add mapped structures to result
-                                            result.scenario_outcomes = mappedOutcomes;
-                                            result.mapped_detailed_breakdowns = mappedDetailedBreakdowns;
-                                            
-                                            return result;
-                                        } catch (error) {
-                                            console.error("Error mapping backend keys to frontend:", error);
-                                            return result; // Return original result if mapping fails
-                                        }
-                                    };
-                                    
-                                    // Map backend keys to frontend expected keys
                                     const mappedResult = mapBackendToFrontendKeys(scenarioResult.result);
                                     
                                     // Use mapped result
                                     const outcomes = mappedResult.scenario_outcomes || {};
-                                    
-                                    // State for tracking which scenarios have expanded detailed breakdowns
-                                    const [expandedScenarios, setExpandedScenarios] = useState<Record<string, boolean>>({});
-                                    
-                                    // Toggle function for expanding/collapsing detailed breakdown
-                                    const toggleDetailedBreakdown = (scenarioId: string, growthKey: string) => {
-                                        const key = `${scenarioId}-${growthKey}`;
-                                        setExpandedScenarios(prev => ({
-                                            ...prev,
-                                            [key]: !prev[key]
-                                        }));
-                                    };
                                     
                                     return resultRowOrder.map((key, index) => {
                                         // Skip if this outcome doesn't exist
@@ -1103,4 +1121,3 @@ function App() {
 }
 
 export default App;
-
