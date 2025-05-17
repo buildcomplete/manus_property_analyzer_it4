@@ -973,6 +973,33 @@ function App() {
 
     // Define the order for result rows
     const resultRowOrder: (keyof SingleScenarioResult['scenario_outcomes'])[] = ['zero_growth', 'average', 'low_risk', 'high_risk'];
+    
+    // Function to format growth rate as percentage
+    const formatGrowthRate = (rate: number): string => {
+        return `${(rate * 100).toFixed(1)}%`;
+    };
+    
+    // Get growth rate labels with percentages
+    const getResultRowLabel = (key: keyof SingleScenarioResult['scenario_outcomes']): string => {
+        const baseLabel = resultRowLabels[key];
+        const growthRates = results?.growth_rates;
+        
+        if (!growthRates) return baseLabel;
+        
+        // Map frontend keys to backend keys
+        const backendKeyMap: Record<string, string> = {
+            'average': 'avg_growth',
+            'zero_growth': 'zero_growth',
+            'low_risk': 'low_risk',
+            'high_risk': 'high_risk'
+        };
+        
+        const backendKey = backendKeyMap[key];
+        if (!backendKey || !growthRates[backendKey]) return baseLabel;
+        
+        return `${baseLabel} (${formatGrowthRate(growthRates[backendKey])})`;
+    };
+    
     const resultRowLabels: Record<keyof SingleScenarioResult['scenario_outcomes'], string> = {
         zero_growth: 'Zero Growth',
         average: 'Average Growth',
@@ -1259,7 +1286,7 @@ function App() {
                                                         </td>
                                                     )}
                                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                                                        {resultRowLabels[key]}
+                                                        {getResultRowLabel(key)}
                                                         {hasDetailedBreakdown && (
                                                             <button 
                                                                 onClick={() => toggleDetailedBreakdown(scenarioId, key)}

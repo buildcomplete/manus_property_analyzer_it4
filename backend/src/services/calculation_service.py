@@ -329,12 +329,10 @@ def calculate_selling_costs(country, city, selling_price, purchase_price, purcha
             costs["total"] += capital_gains_tax
     
     elif country == "denmark":
-        # Capital gains tax (simplified, actual rules are complex)
-        if capital_gains > 0:
-            tax_rate = get_rate(country, city, "capital_gains_tax_rate_denmark")
-            capital_gains_tax = capital_gains * tax_rate
-            costs["breakdown"]["capital_gains_tax"] = capital_gains_tax
-            costs["total"] += capital_gains_tax
+        # No capital gains tax for Danish properties when tax resident in Denmark
+        # This assumes the user is tax resident in the same country as the property
+        costs["breakdown"]["capital_gains_tax"] = 0
+        costs["breakdown"]["note"] = "No capital gains tax applied (assumes tax residence in Denmark)"
     
     return costs
 
@@ -463,6 +461,14 @@ def perform_calculation_for_scenario(calculation_input):
         "high_risk": calculate_future_value(price, avg_appreciation_rate + std_dev, years_to_sell)
     }
     
+    # Store growth rates for frontend display
+    growth_rates = {
+        "zero_growth": 0,
+        "avg_growth": avg_appreciation_rate,
+        "low_risk": max(0, avg_appreciation_rate - std_dev),
+        "high_risk": avg_appreciation_rate + std_dev
+    }
+    
     # Calculate selling costs and capital gains tax for each scenario
     selling_scenarios = {}
     beckham_law_active = inputs.get("beckham_law_active", False)
@@ -514,7 +520,8 @@ def perform_calculation_for_scenario(calculation_input):
             "years_to_sell": years_to_sell,
             "warnings": []
         },
-        "detailed_breakdowns": detailed_breakdowns  # Add detailed breakdowns to the result
+        "detailed_breakdowns": detailed_breakdowns,  # Add detailed breakdowns to the result
+        "growth_rates": growth_rates  # Add growth rates for frontend display
     }
     
     return result
