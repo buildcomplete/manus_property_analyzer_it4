@@ -306,7 +306,38 @@ def calculate_selling_costs(country, city, selling_price, purchase_price, purcha
     costs["breakdown"]["selling_agency_fee"] = agency_fee
     costs["total"] += agency_fee
 
-    capital_gains = max(0, selling_price - purchase_costs_investment_total)
+    capital_gain = selling_price - purchase_costs_investment_total
+    costs["breakdown"]["capital_gain"] = capital_gain
+    
+    # Capital gains tax calculation
+    capital_gains_tax = 0
+    
+    # For Denmark, capital gains tax is 0 when tax resident in Denmark
+    if country == "denmark":
+        # No capital gains tax for Danish properties when tax resident in Denmark
+        costs["breakdown"]["capital_gains_tax_note"] = "No capital gains tax applied (assumes tax residence in Denmark)"
+        capital_gains_tax = 0
+    elif country == "spain":
+        if beckham_law_active:
+            # Beckham law flat rate on capital gains
+            beckham_rate = get_rate(country, city, "beckham_law_tax_rate")
+            capital_gains_tax = capital_gain * beckham_rate if capital_gain > 0 else 0
+            costs["breakdown"]["capital_gains_tax_beckham"] = capital_gains_tax
+        else:
+            # Standard progressive capital gains tax
+            rates_table = get_rate(country, city, "capital_gains_tax_rate_spain")
+            capital_gains_tax = calculate_progressive_tax(capital_gain, rates_table) if capital_gain > 0 else 0
+            costs["breakdown"]["capital_gains_tax_standard"] = capital_gains_tax
+    
+    costs["breakdown"]["capital_gains_tax"] = capital_gains_tax
+    costs["total"] += capital_gains_tax
+    
+    if country == "spain":
+        plusvalia_municipal = get_rate(country, city, "selling_plusvalia_municipal")
+        costs["breakdown"]["plusvalia_municipal"] = plusvalia_municipal
+        costs["total"] += plusvalia_municipal
+    
+    return costs_gains = max(0, selling_price - purchase_costs_investment_total)
     
     if country == "spain":
         # Plusvalia municipal (example calculation, actual formula is complex)

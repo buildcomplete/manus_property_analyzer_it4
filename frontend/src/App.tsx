@@ -1,4 +1,5 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import './App.css'; // Ensure Tailwind is configured via index.css or similar
 import DetailedBreakdownTable from './DetailedBreakdownTable';
 import ErrorBoundary from './ErrorBoundary';
@@ -299,318 +300,6 @@ const RenovationInput = ({ renovations, onChange, currency }: { renovations: Ren
     );
 };
 
-// --- Payment Schedule Input Component ---
-const PaymentScheduleInput = ({ schedule, onChange }: { schedule: PaymentScheduleItem[] | undefined, onChange: (schedule: PaymentScheduleItem[]) => void }) => {
-    const addPayment = () => {
-        const currentSchedule = schedule || [];
-        onChange([...currentSchedule, { percentage: 0, due_year: 0 }]);
-    };
-
-    const updatePayment = (index: number, field: keyof PaymentScheduleItem, value: any) => {
-        const currentSchedule = schedule || [];
-        onChange(currentSchedule.map((p, i) => i === index ? { ...p, [field]: parseFloat(value) || 0 } : p));
-    };
-
-    const removePayment = (index: number) => {
-        const currentSchedule = schedule || [];
-        onChange(currentSchedule.filter((_, i) => i !== index));
-    };
-
-    const totalPercentage = (schedule || []).reduce((sum, p) => sum + (p.percentage || 0), 0);
-
-    return (
-        <div className="mb-4 p-3 border rounded-md bg-gray-50">
-            <h4 className="font-medium mb-2 text-md">Payment Schedule (Under Construction)</h4>
-            <p className="text-xs text-gray-500 mb-2 italic">Define payments made before completion (e.g., 10% at signing, 90% at completion). Total must be 100%.</p>
-            {(schedule || []).map((payment, index) => (
-                 <div key={index} className="flex items-center space-x-2 mb-2 border-b pb-2">
-                     <input
-                        type="number"
-                        value={payment.percentage * 100} // Display as percentage
-                        onChange={(e) => updatePayment(index, 'percentage', parseFloat(e.target.value) / 100)} // Store as decimal
-                        placeholder="%"
-                        className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        title="Percentage of purchase price due."
-                    />
-                    <span className="text-sm">% due in year</span>
-                    <input
-                        type="number"
-                        value={payment.due_year}
-                        onChange={(e) => updatePayment(index, 'due_year', parseInt(e.target.value, 10))}
-                        placeholder="Year"
-                        className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        title="Year payment is due (0 = signing/start, completion year = final payment)."
-                    />
-                     <button onClick={() => removePayment(index)} className="text-red-500 hover:text-red-700 p-1" title="Remove payment stage">
-                        X
-                    </button>
-                 </div>
-            ))}
-             <button onClick={addPayment} className="mt-2 text-sm text-indigo-600 hover:text-indigo-800 flex items-center">
-                +
-                Add Payment Stage
-            </button>
-            <p className={`text-xs mt-2 ${Math.abs(totalPercentage - 1.0) > 0.001 ? 'text-red-600 font-semibold' : 'text-gray-600'}`}>
-                Total Percentage: {(totalPercentage * 100).toFixed(1)}%
-            </p>
-        </div>
-    );
-};
-
-// --- Loan Payback Schedule Component ---
-const LoanPaybackScheduleTable = ({ loanDetails, currency }: { loanDetails: LoanDetails, currency: string }) => {
-    const [schedule, setSchedule] = useState<LoanPaybackSchedule | null>(null);
-    const [showFullSchedule, setShowFullSchedule] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-
-    const calculateSchedule = () => {
-        if (!loanDetails.amount || !loanDetails.interest_rate || !loanDetails.term_years) {
-            return;
-        }
-
-        setIsLoading(true);
-
-        try {
-            const loanAmount = loanDetails.amount;
-            const annualRate = loanDetails.interest_rate;
-            const termYears = loanDetails.term_years;
-            
-            // Calculate monthly interest rate
-            const monthlyRate = annualRate / 12;
-            
-            // Calculate total number of payments
-            const totalPayments = termYears * 12;
-            
-            // Calculate monthly payment using the formula: P = L[c(1 + c)^n]/[(1 + c)^n - 1]
-            // Where P = payment, L = loan amount, c = monthly interest rate, n = total number of payments
-            const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
-            
-            // Generate amortization schedule
-            let remainingBalance = loanAmount;
-            let totalInterest = 0;
-            let totalPrincipal = 0;
-            
-            const payments: LoanPaymentItem[] = [];
-            
-            for (let i = 1; i <= totalPayments; i++) {
-                // Calculate interest for this period
-                const interestPayment = remainingBalance * monthlyRate;
-                
-                // Calculate principal for this period
-                const principalPayment = monthlyPayment - interestPayment;
-                
-                // Update remaining balance
-                remainingBalance -= principalPayment;
-                
-                // Update totals
-                totalInterest += interestPayment;
-                totalPrincipal += principalPayment;
-                
-                // Calculate payment date
-                const currentDate = new Date();
-                currentDate.setMonth(currentDate.getMonth() + i);
-                const paymentDate = currentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
-                
-                // Add payment to schedule
-                payments.push({
-                    payment_number: i,
-                    payment_date: paymentDate,
-                    payment_amount: monthlyPayment,
-                    principal_payment: principalPayment,
-                    interest_payment: interestPayment,
-                    remaining_balance: Math.max(0, remainingBalance) // Ensure we don't show negative balance due to rounding
-                });
-            }
-            
-            setSchedule({
-                monthly_payment: monthlyPayment,
-                total_payments: totalPayments,
-                total_interest: totalInterest,
-                total_principal: totalPrincipal,
-                payments
-            });
-        } catch (error) {
-            console.error("Error calculating loan schedule:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Display a limited number of payments initially
-    const displayedPayments = showFullSchedule ? schedule?.payments : schedule?.payments.slice(0, 12);
-
-    return (
-        <div className="mt-4 p-4 border rounded-md bg-gray-50">
-            <h3 className="text-lg font-semibold mb-4">Loan Payback Schedule</h3>
-            
-            {!schedule && (
-                <div className="text-center">
-                    <button 
-                        onClick={calculateSchedule}
-                        disabled={isLoading || !loanDetails.amount || !loanDetails.interest_rate || !loanDetails.term_years}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isLoading ? 'Calculating...' : 'Calculate Loan Schedule'}
-                    </button>
-                    {(!loanDetails.amount || !loanDetails.interest_rate || !loanDetails.term_years) && (
-                        <p className="mt-2 text-sm text-red-500">Please fill in all loan details (amount, interest rate, term) to calculate the schedule.</p>
-                    )}
-                </div>
-            )}
-            
-            {schedule && (
-                <div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <div className="p-3 bg-white rounded border">
-                            <h4 className="font-medium text-gray-700">Monthly Payment</h4>
-                            <p className="text-xl font-bold text-indigo-700">{currency}{schedule.monthly_payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        </div>
-                        <div className="p-3 bg-white rounded border">
-                            <h4 className="font-medium text-gray-700">Total Interest</h4>
-                            <p className="text-xl font-bold text-indigo-700">{currency}{schedule.total_interest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        </div>
-                    </div>
-                    
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 border">
-                            <thead className="bg-gray-100">
-                                <tr>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase">Payment #</th>
-                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
-                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Payment</th>
-                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Principal</th>
-                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Interest</th>
-                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Remaining</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {displayedPayments?.map((payment) => (
-                                    <tr key={payment.payment_number} className={payment.payment_number % 2 === 0 ? 'bg-gray-50' : ''}>
-                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">{payment.payment_number}</td>
-                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">{payment.payment_date}</td>
-                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 text-right">
-                                            {currency}{payment.payment_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-green-600 text-right">
-                                            {currency}{payment.principal_payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-red-600 text-right">
-                                            {currency}{payment.interest_payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 text-right">
-                                            {currency}{payment.remaining_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    {schedule.payments.length > 12 && (
-                        <div className="mt-4 text-center">
-                            <button 
-                                onClick={() => setShowFullSchedule(!showFullSchedule)}
-                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                            >
-                                {showFullSchedule ? 'Show Less' : `Show All ${schedule.payments.length} Payments`}
-                            </button>
-                        </div>
-                    )}
-                    
-                    <div className="mt-4 text-center">
-                        <button 
-                            onClick={() => setSchedule(null)}
-                            className="px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200"
-                        >
-                            Reset Schedule
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-// --- Renting Scenario Input Component ---
-const RentingScenarioInputSection = ({ inputs, onChange, currency }: { inputs: RentingScenarioInputs, onChange: (newInputs: RentingScenarioInputs) => void, currency: string }) => {
-    const handleInputChange = (field: keyof RentingScenarioInputs, value: string | number) => {
-        const numValue = typeof value === 'string' ? parseFloat(value) : value;
-        onChange({ ...inputs, [field]: isNaN(numValue) ? undefined : numValue });
-    };
-
-    const handleIncrementChange = (field: keyof RentingScenarioInputs, value: string | number) => {
-        let numValue = typeof value === 'string' ? parseFloat(value) : value;
-        if (!isNaN(numValue)) {
-            numValue = numValue / 100; // Convert percentage to decimal
-        }
-        onChange({ ...inputs, [field]: isNaN(numValue) ? undefined : numValue });
-    };
-
-    return (
-        <div className="p-6 border border-gray-300 rounded-lg shadow-md bg-blue-50">
-            <h3 className="text-xl font-semibold mb-6 text-gray-800 border-b pb-2">Renting Scenario (Optional Baseline)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                <InputField
-                    label={`Monthly Rent (${currency})`}
-                    value={inputs.monthly_rent}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_rent', e.target.value)}
-                    placeholder="e.g., 1200"
-                    tooltip="Your estimated monthly rent payment."
-                />
-                <InputField
-                    label="Annual Rent Increment (%)"
-                    value={inputs.annual_rent_increment !== undefined ? inputs.annual_rent_increment * 100 : ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_rent_increment', e.target.value)}
-                    placeholder="e.g., 2"
-                    tooltip="Annual percentage increase in rent (e.g., 2 for 2%)."
-                />
-                <InputField
-                    label={`Monthly Water (${currency})`}
-                    value={inputs.monthly_water}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_water', e.target.value)}
-                    placeholder="e.g., 50"
-                    tooltip="Your estimated monthly water bill."
-                />
-                <InputField
-                    label="Annual Water Increment (%)"
-                    value={inputs.annual_water_increment !== undefined ? inputs.annual_water_increment * 100 : ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_water_increment', e.target.value)}
-                    placeholder="e.g., 1"
-                    tooltip="Annual percentage increase in water costs (e.g., 1 for 1%)."
-                />
-                <InputField
-                    label={`Monthly Utilities (${currency})`}
-                    value={inputs.monthly_utilities}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_utilities', e.target.value)}
-                    placeholder="e.g., 100"
-                    tooltip="Your estimated monthly utilities (electricity, gas, etc.)."
-                />
-                <InputField
-                    label="Annual Utilities Increment (%)"
-                    value={inputs.annual_utilities_increment !== undefined ? inputs.annual_utilities_increment * 100 : ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_utilities_increment', e.target.value)}
-                    placeholder="e.g., 1"
-                    tooltip="Annual percentage increase in utilities costs (e.g., 1 for 1%)."
-                />
-                <InputField
-                    label={`Monthly Parking (${currency})`}
-                    value={inputs.monthly_parking}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_parking', e.target.value)}
-                    placeholder="e.g., 75"
-                    tooltip="Your estimated monthly parking costs (if applicable)."
-                />
-                <InputField
-                    label="Annual Parking Increment (%)"
-                    value={inputs.annual_parking_increment !== undefined ? inputs.annual_parking_increment * 100 : ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_parking_increment', e.target.value)}
-                    placeholder="e.g., 1"
-                    tooltip="Annual percentage increase in parking costs (e.g., 1 for 1%)."
-                />
-            </div>
-        </div>
-    );
-};
-
 // --- Scenario Input Component ---
 const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: ScenarioInputsState, onChange: (updatedData: ScenarioInputsState) => void, onRemove: () => void, currency: string }) => {
     // Options for dropdowns
@@ -702,301 +391,494 @@ const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: S
                         value={scenario.country}
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('country', e.target.value)}
                         options={countryOptions}
-                        tooltip="Select the country where the property is located."
                     />
+                    
                     <SelectField
                         label="City"
                         value={scenario.city}
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('city', e.target.value)}
                         options={cityOptions[scenario.country]}
-                        tooltip="Select the city where the property is located."
-                        disabled // Disable city selection for now as it's fixed
                     />
+                    
                     <SelectField
                         label="Property Type"
                         value={scenario.property_type}
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('property_type', e.target.value)}
                         options={propertyTypeOptions}
-                        tooltip="Select the type of property."
                     />
+                    
                     <InputField
-                        label={`Purchase Price (${currency})`}
+                        label={`Property Price (${currency})`}
                         value={scenario.new_flat_price}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('new_flat_price', parseFloat(e.target.value) || undefined)}
-                        placeholder="e.g., 300000"
-                        tooltip="The total purchase price of the property."
+                        placeholder="e.g., 500000"
+                        tooltip="The purchase price of the property."
+                    />
+                    
+                    {scenario.country === 'spain' && (
+                        <>
+                            <CheckboxField
+                                label="Beckham Law Active"
+                                checked={scenario.beckham_law_active || false}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('beckham_law_active', e.target.checked)}
+                                tooltip="Whether you qualify for the Beckham Law tax regime."
+                            />
+                            
+                            {scenario.beckham_law_active && (
+                                <InputField
+                                    label="Beckham Law Remaining Years"
+                                    value={scenario.beckham_law_remaining_years}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('beckham_law_remaining_years', parseInt(e.target.value, 10) || undefined)}
+                                    placeholder="e.g., 5"
+                                    tooltip="Number of years remaining on your Beckham Law eligibility."
+                                    min={0}
+                                    max={6}
+                                />
+                            )}
+                        </>
+                    )}
+                    
+                    {scenario.country === 'denmark' && scenario.property_type === 'andels' && (
+                        <SelectField
+                            label="Loan Type"
+                            value={scenario.loan_type || 'standard'}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('loan_type', e.target.value)}
+                            options={loanTypeOptions}
+                            tooltip="Type of loan for Andels property."
+                        />
+                    )}
+                    
+                    {scenario.property_type === 'under_construction' && (
+                        <InputField
+                            label="Completion Time (Years)"
+                            value={scenario.construction_completion_years}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('construction_completion_years', parseFloat(e.target.value) || undefined)}
+                            placeholder="e.g., 2"
+                            tooltip="Expected time until construction is completed (in years)."
+                            step="0.5"
+                            min={0}
+                        />
+                    )}
+                    
+                    <RenovationInput
+                        renovations={scenario.renovations}
+                        onChange={handleRenovationChange}
+                        currency={currency}
                     />
                 </div>
-
+                
                 {/* Column 2 */}
                 <div>
-                    <h4 className="font-medium mb-2 text-md">Loan Details</h4>
-                    <div className="relative">
+                    <div className="mb-6 p-4 border rounded-md bg-gray-50">
+                        <h4 className="font-medium mb-3 text-md">Loan Details</h4>
+                        
                         <InputField
                             label={`Loan Amount (${currency})`}
                             value={scenario.loan_details?.amount}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'amount', e.target.value)}
-                            placeholder="e.g., 240000"
-                            tooltip="The total amount of the loan."
+                            placeholder="e.g., 400000"
+                            tooltip="The principal amount of the loan."
                         />
-                        <button 
-                            onClick={() => {
-                                if (scenario.new_flat_price) {
-                                    const eightyPercent = Math.round(scenario.new_flat_price * 0.8);
-                                    handleNestedChange('loan_details', 'amount', eightyPercent);
-                                }
+                        
+                        <InputField
+                            label="Interest Rate (%)"
+                            value={scenario.loan_details?.interest_rate !== undefined ? scenario.loan_details.interest_rate * 100 : ''}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const value = e.target.value === '' ? undefined : parseFloat(e.target.value) / 100;
+                                handleNestedChange('loan_details', 'interest_rate', value);
                             }}
-                            className="absolute right-0 top-8 px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 border border-indigo-300"
-                            title="Set loan amount to 80% of property price"
-                            type="button"
-                        >
-                            Set to 80%
-                        </button>
-                    </div>
-                    <InputField
-                        label="Interest Rate (% p.a.)"
-                        type="number"
-                        value={scenario.loan_details?.interest_rate !== undefined ? scenario.loan_details.interest_rate * 100 : ''}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'interest_rate', parseFloat(e.target.value) / 100)}
-                        placeholder="e.g., 3.5 for 3.5%"
-                        step="0.01"
-                        tooltip="Annual interest rate for the loan (e.g., 3.5 for 3.5%)."
-                    />
-                    <InputField
-                        label="Loan Term (Years)"
-                        value={scenario.loan_details?.term_years}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'term_years', parseInt(e.target.value, 10) || undefined)}
-                        placeholder="e.g., 30"
-                        tooltip="The total term of the loan in years."
-                    />
-                    {scenario.country === 'denmark' && scenario.property_type === 'andels' && (
-                        <SelectField
-                            label="Loan Type (Denmark - Andels)"
-                            value={scenario.loan_type || 'standard'}
-                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('loan_type', e.target.value)}
-                            options={loanTypeOptions}
-                            tooltip="Select the type of loan for Andelsbolig."
+                            placeholder="e.g., 3.5"
+                            tooltip="Annual interest rate (e.g., 3.5 for 3.5%)."
+                            step="0.01"
+                            min={0}
+                            max={20}
                         />
+                        
+                        <InputField
+                            label="Term (Years)"
+                            value={scenario.loan_details?.term_years}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'term_years', e.target.value)}
+                            placeholder="e.g., 30"
+                            tooltip="Duration of the loan in years."
+                            min={1}
+                            max={50}
+                        />
+                        
+                        {/* Loan Payback Schedule Component */}
+                        {scenario.loan_details?.amount && scenario.loan_details?.interest_rate && scenario.loan_details?.term_years && (
+                            <LoanPaybackScheduleComponent 
+                                loanDetails={scenario.loan_details} 
+                                currency={currency === 'EUR' ? '€' : 'kr'} 
+                            />
+                        )}
+                    </div>
+                    
+                    {scenario.property_type === 'under_construction' && (
+                        <div className="mb-6 p-4 border rounded-md bg-gray-50">
+                            <h4 className="font-medium mb-3 text-md">Payment Schedule</h4>
+                            <p className="text-xs text-gray-500 mb-3">Define when payments are due during construction.</p>
+                            
+                            {/* Payment schedule component would go here */}
+                            <p className="text-sm text-gray-600">Payment schedule implementation coming soon.</p>
+                        </div>
                     )}
                 </div>
             </div>
+        </div>
+    );
+};
 
-            {/* Conditional Inputs based on Property Type / Country */}
-            {scenario.property_type === 'under_construction' && (
-                <PaymentScheduleInput 
-                    schedule={scenario.payment_schedule}
-                    onChange={handlePaymentScheduleChange} 
-                />
-            )}
-            {scenario.property_type === 'under_construction' && (
-                 <InputField
-                    label="Construction Completion (Years from Purchase)"
-                    value={scenario.construction_completion_years}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('construction_completion_years', parseInt(e.target.value, 10) || undefined)}
-                    placeholder="e.g., 2"
-                    tooltip="Number of years until the property construction is completed and habitable."
-                />
-            )}
+// --- Loan Payback Schedule Component ---
+const LoanPaybackScheduleComponent = ({ loanDetails, currency }: { loanDetails: LoanDetails, currency: string }) => {
+    const [schedule, setSchedule] = useState<LoanPaybackSchedule | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [showFullSchedule, setShowFullSchedule] = useState(false);
+    
+    const calculateSchedule = () => {
+        setIsLoading(true);
+        
+        try {
+            const { amount = 0, interest_rate = 0, term_years = 0 } = loanDetails;
+            
+            if (!amount || !interest_rate || !term_years) {
+                throw new Error("Missing loan details");
+            }
+            
+            // Calculate monthly payment
+            const monthlyRate = interest_rate / 12;
+            const totalPayments = term_years * 12;
+            const monthlyPayment = amount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+            
+            // Generate amortization schedule
+            let remainingBalance = amount;
+            const payments: LoanPaymentItem[] = [];
+            let totalInterest = 0;
+            let totalPrincipal = 0;
+            
+            for (let i = 1; i <= totalPayments; i++) {
+                // Calculate interest for this period
+                const interestPayment = remainingBalance * monthlyRate;
+                
+                // Calculate principal for this period
+                const principalPayment = monthlyPayment - interestPayment;
+                
+                // Update remaining balance
+                remainingBalance -= principalPayment;
+                
+                // Update totals
+                totalInterest += interestPayment;
+                totalPrincipal += principalPayment;
+                
+                // Calculate payment date
+                const currentDate = new Date();
+                currentDate.setMonth(currentDate.getMonth() + i);
+                const paymentDate = currentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+                
+                // Add payment to schedule
+                payments.push({
+                    payment_number: i,
+                    payment_date: paymentDate,
+                    payment_amount: monthlyPayment,
+                    principal_payment: principalPayment,
+                    interest_payment: interestPayment,
+                    remaining_balance: Math.max(0, remainingBalance) // Ensure we don't show negative balance due to rounding
+                });
+            }
+            
+            setSchedule({
+                monthly_payment: monthlyPayment,
+                total_payments: totalPayments,
+                total_interest: totalInterest,
+                total_principal: totalPrincipal,
+                payments
+            });
+        } catch (error) {
+            console.error("Error calculating loan schedule:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-            {scenario.country === 'spain' && (
-                <>
-                    <CheckboxField
-                        label="Beckham Law Active?"
-                        checked={!!scenario.beckham_law_active}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('beckham_law_active', e.target.checked)}
-                        tooltip="Is the Beckham Law (special tax regime for impatriates) applicable?"
-                    />
-                    {scenario.beckham_law_active && (
-                        <InputField
-                            label="Beckham Law Remaining Years"
-                            value={scenario.beckham_law_remaining_years}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('beckham_law_remaining_years', parseInt(e.target.value, 10) || undefined)}
-                            placeholder="e.g., 3"
-                            tooltip="Number of years remaining under the Beckham Law."
-                        />
+    // Display a limited number of payments initially
+    const displayedPayments = showFullSchedule ? schedule?.payments : schedule?.payments?.slice(0, 12);
+
+    return (
+        <div className="mt-4 p-4 border rounded-md bg-gray-50">
+            <h3 className="text-lg font-semibold mb-4">Loan Payback Schedule</h3>
+            
+            {!schedule && (
+                <div className="text-center">
+                    <button 
+                        onClick={calculateSchedule}
+                        disabled={isLoading || !loanDetails.amount || !loanDetails.interest_rate || !loanDetails.term_years}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? 'Calculating...' : 'Calculate Loan Schedule'}
+                    </button>
+                    {(!loanDetails.amount || !loanDetails.interest_rate || !loanDetails.term_years) && (
+                        <p className="mt-2 text-sm text-red-500">Please fill in all loan details (amount, interest rate, term) to calculate the schedule.</p>
                     )}
-                </>
+                </div>
             )}
             
-            {/* Renovations are always available */}
-            <RenovationInput renovations={scenario.renovations} onChange={handleRenovationChange} currency={currency} />
-
-            {/* Loan Payback Schedule */}
-            {scenario.loan_details?.amount && scenario.loan_details?.interest_rate && scenario.loan_details?.term_years && (
-                <LoanPaybackScheduleTable loanDetails={scenario.loan_details} currency={currency} />
+            {schedule && (
+                <div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div className="p-3 bg-white rounded border">
+                            <h4 className="font-medium text-gray-700">Monthly Payment</h4>
+                            <p className="text-xl font-bold text-indigo-700">{currency}{schedule.monthly_payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        </div>
+                        <div className="p-3 bg-white rounded border">
+                            <h4 className="font-medium text-gray-700">Total Interest</h4>
+                            <p className="text-xl font-bold text-indigo-700">{currency}{schedule.total_interest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 border">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase">Payment #</th>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Payment</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Principal</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Interest</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-600 uppercase">Remaining</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {displayedPayments?.map((payment) => (
+                                    <tr key={payment.payment_number} className={payment.payment_number % 2 === 0 ? 'bg-gray-50' : ''}>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">{payment.payment_number}</td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">{payment.payment_date}</td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 text-right">
+                                            {currency}{payment.payment_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-green-600 text-right">
+                                            {currency}{payment.principal_payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-red-600 text-right">
+                                            {currency}{payment.interest_payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 text-right">
+                                            {currency}{payment.remaining_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div className="mt-4 text-center">
+                        <button 
+                            onClick={() => setShowFullSchedule(!showFullSchedule)}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        >
+                            {showFullSchedule ? 'Show First Year Only' : 'Show Full Schedule'}
+                        </button>
+                    </div>
+                </div>
             )}
+        </div>
+    );
+};
+
+// --- Renting Scenario Input Component ---
+const RentingScenarioInputComponent = ({ inputs, onChange }: { inputs: RentingScenarioInputs, onChange: (updatedInputs: RentingScenarioInputs) => void }) => {
+    // Handle input changes
+    const handleInputChange = (field: keyof RentingScenarioInputs, value: any) => {
+        onChange({ ...inputs, [field]: value });
+    };
+    
+    // Handle percentage inputs (convert from display % to decimal)
+    const handleIncrementChange = (field: keyof RentingScenarioInputs, value: string) => {
+        const numValue = value === '' ? undefined : parseFloat(value) / 100;
+        handleInputChange(field, numValue);
+    };
+
+    return (
+        <div className="p-6 bg-white rounded-lg shadow-md">
+            <h3 className="text-lg font-semibold mb-4">Renting Scenario</h3>
+            <p className="text-sm text-gray-600 mb-4">Define the costs associated with renting instead of buying.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Column 1: Monthly Costs */}
+                <div>
+                    <h4 className="font-medium mb-3 text-md">Monthly Costs</h4>
+                    <InputField
+                        label="Monthly Rent"
+                        value={inputs.monthly_rent}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_rent', parseFloat(e.target.value) || undefined)}
+                        placeholder="e.g., 1500"
+                        tooltip="Your monthly rent payment."
+                    />
+                    <InputField
+                        label="Monthly Water"
+                        value={inputs.monthly_water}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_water', parseFloat(e.target.value) || undefined)}
+                        placeholder="e.g., 50"
+                        tooltip="Your estimated monthly water costs."
+                    />
+                    <InputField
+                        label="Monthly Utilities"
+                        value={inputs.monthly_utilities}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_utilities', parseFloat(e.target.value) || undefined)}
+                        placeholder="e.g., 100"
+                        tooltip="Your estimated monthly utility costs (electricity, gas, etc.)."
+                    />
+                    <InputField
+                        label="Monthly Parking"
+                        value={inputs.monthly_parking}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('monthly_parking', parseFloat(e.target.value) || undefined)}
+                        placeholder="e.g., 75"
+                        tooltip="Your estimated monthly parking costs (if applicable)."
+                    />
+                </div>
+                
+                {/* Column 2: Annual Increments */}
+                <div>
+                    <h4 className="font-medium mb-3 text-md">Annual Percentage Increases</h4>
+                    <InputField
+                        label="Annual Rent Increment (%)"
+                        value={inputs.annual_rent_increment !== undefined ? inputs.annual_rent_increment * 100 : ''}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_rent_increment', e.target.value)}
+                        placeholder="e.g., 2"
+                        tooltip="Annual percentage increase in rent (e.g., 2 for 2%)."
+                    />
+                    <InputField
+                        label="Annual Water Increment (%)"
+                        value={inputs.annual_water_increment !== undefined ? inputs.annual_water_increment * 100 : ''}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_water_increment', e.target.value)}
+                        placeholder="e.g., 1"
+                        tooltip="Annual percentage increase in water costs (e.g., 1 for 1%)."
+                    />
+                    <InputField
+                        label="Annual Utilities Increment (%)"
+                        value={inputs.annual_utilities_increment !== undefined ? inputs.annual_utilities_increment * 100 : ''}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_utilities_increment', e.target.value)}
+                        placeholder="e.g., 1"
+                        tooltip="Annual percentage increase in utility costs (e.g., 1 for 1%)."
+                    />
+                    <InputField
+                        label="Annual Parking Increment (%)"
+                        value={inputs.annual_parking_increment !== undefined ? inputs.annual_parking_increment * 100 : ''}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncrementChange('annual_parking_increment', e.target.value)}
+                        placeholder="e.g., 1"
+                        tooltip="Annual percentage increase in parking costs (e.g., 1 for 1%)."
+                    />
+                </div>
+            </div>
         </div>
     );
 };
 
 // --- Main App Component ---
 function App() {
-    const [personalFinance, setPersonalFinance] = useState<PersonalFinanceInputs>({});
-    const [scenarioSettings, setScenarioSettings] = useState<ScenarioSettingsInputs>({ years_to_sell: 10, currency: 'EUR' });
-    const [scenarios, setScenarios] = useState<ScenarioInputsState[]>([
-        { id: 's1', name: 'Scenario 1', country: 'spain', city: 'barcelona', property_type: 'new', renovations: [], loan_details: { interest_rate: 0.035, term_years: 30} },
-    ]);
-    const [rentingInputs, setRentingInputs] = useState<RentingScenarioInputs>({}); // State for renting inputs
-    const [activeTab, setActiveTab] = useState<string>(scenarios[0]?.id || 's1');
+    // State for app version
+    const [appVersion, setAppVersion] = useState<string>("");
+    
+    // Load app version from config
+    useEffect(() => {
+        if (window.RUNTIME_CONFIG && window.RUNTIME_CONFIG.VERSION) {
+            setAppVersion(window.RUNTIME_CONFIG.VERSION);
+        }
+    }, []);
+    
+    // State for scenarios
+    const [scenarios, setScenarios] = useState<ScenarioInputsState[]>([]);
+    
+    // State for personal finance inputs
+    const [personalFinance, setPersonalFinance] = useState<PersonalFinanceInputs>({
+        salary: undefined,
+        tax_rate_override: null,
+        existing_flat_value: undefined,
+        existing_loan_size: undefined
+    });
+    
+    // State for scenario settings
+    const [scenarioSettings, setScenarioSettings] = useState<ScenarioSettingsInputs>({
+        years_to_sell: 5,
+        currency: 'EUR'
+    });
+    
+    // State for renting scenario
+    const [rentingScenarioInputs, setRentingScenarioInputs] = useState<RentingScenarioInputs>({
+        monthly_rent: undefined,
+        monthly_water: undefined,
+        monthly_utilities: undefined,
+        monthly_parking: undefined,
+        annual_rent_increment: 0,
+        annual_water_increment: 0,
+        annual_utilities_increment: 0,
+        annual_parking_increment: 0
+    });
+    
+    // State for calculation results
     const [results, setResults] = useState<BackendResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // State for tracking which scenarios have expanded detailed breakdowns
+    
+    // State for expanded detailed breakdowns
     const [expandedScenarios, setExpandedScenarios] = useState<Record<string, boolean>>({});
-
-    const handlePersonalFinanceChange = (field: keyof PersonalFinanceInputs, value: any) => {
-        setPersonalFinance(prev => ({ ...prev, [field]: parseFloat(value) || undefined }));
-    };
-
-    const handleScenarioSettingsChange = (field: keyof ScenarioSettingsInputs, value: any) => {
-        if (field === 'currency') {
-            setScenarioSettings(prev => ({ ...prev, [field]: value as 'EUR' | 'DKK' }));
-        } else {
-            setScenarioSettings(prev => ({ ...prev, [field]: parseInt(value, 10) || 0 }));
-        }
-    };
-
-    const handleRentingInputChange = (updatedInputs: RentingScenarioInputs) => {
-        setRentingInputs(updatedInputs);
-    };
-
+    
+    // Currency symbol based on selected currency
+    const currencySymbol = scenarioSettings.currency === 'EUR' ? '€' : 'kr';
+    
+    // Add a new scenario
     const addScenario = () => {
-        const newId = `s${Date.now()}`;
         const newScenario: ScenarioInputsState = {
-            id: newId,
+            id: uuidv4(),
             name: `Scenario ${scenarios.length + 1}`,
-            country: 'spain', // Default to Spain
+            country: 'spain',
             city: 'barcelona',
             property_type: 'new',
             renovations: [],
-            loan_details: { interest_rate: 0.035, term_years: 30}
-        };
-        setScenarios(prev => [...prev, newScenario]);
-        setActiveTab(newId);
-    };
-
-    const updateScenario = (id: string, updatedScenarioData: ScenarioInputsState) => {
-        setScenarios(prev => prev.map(sc => sc.id === id ? updatedScenarioData : sc));
-    };
-
-    const removeScenario = (idToRemove: string) => {
-        setScenarios(prev => prev.filter(sc => sc.id !== idToRemove));
-        if (activeTab === idToRemove && scenarios.length > 1) {
-            setActiveTab(scenarios.filter(sc => sc.id !== idToRemove)[0].id);
-        } else if (scenarios.length <= 1) {
-            // If last tab is removed, or only one tab existed
-            // Consider adding a default scenario or handling empty state
-            if (scenarios.length === 1 && scenarios[0].id === idToRemove) {
-                 // Potentially add a new default scenario or clear activeTab
-                 // For now, just clear activeTab if it was the one removed and no others exist
-                 setActiveTab(''); 
+            loan_details: {
+                amount: undefined,
+                interest_rate: undefined,
+                term_years: undefined
             }
-        }
-    };
-
-    const cleanRenovationsForApi = (renovations: RenovationItem[]): RenovationPayloadItem[] => {
-        return renovations.map(({ id, ...rest }) => rest); // Remove client-side 'id'
-    };
-
-    const handleCalculate = async () => {
-        setIsLoading(true);
-        setError(null);
-        setResults(null);
-
-        const scenariosForApi: BackendScenarioPayload[] = scenarios.map(scenarioState => {
-            const { id, country, city, name: _name, renovations, ...inputsWithoutClientFields } = scenarioState; // _name to avoid unused var
-            const cleanedRenovations = cleanRenovationsForApi(renovations);
-            
-            // Ensure loan_details are passed correctly, even if partially filled
-            const loanDetailsPayload = scenarioState.loan_details ? {
-                amount: scenarioState.loan_details.amount,
-                interest_rate: scenarioState.loan_details.interest_rate,
-                term_years: scenarioState.loan_details.term_years,
-            } : undefined;
-
-            const scenarioSpecificInputs: ScenarioSpecificInputsPayload = {
-                ...inputsWithoutClientFields,
-                renovations: cleanedRenovations,
-                loan_details: loanDetailsPayload,
-                // Ensure property_type is always passed
-                property_type: scenarioState.property_type,
-            };
-
-            return {
-                id,
-                country,
-                city,
-                inputs: scenarioSpecificInputs,
-            };
-        });
-
-        const requestPayload: CalculationRequest = {
-            personal_finance: personalFinance,
-            scenario_settings: scenarioSettings,
-            scenarios: scenariosForApi,
-            renting_scenario_inputs: Object.keys(rentingInputs).length > 0 ? rentingInputs : undefined,
         };
-
-        try {
-            // Get API URL from runtime config (loaded from public/config.js) or fallback to environment variable or default
-            const apiUrl = (window as any).RUNTIME_CONFIG?.API_URL || import.meta.env.VITE_API_URL || '/api';
-            console.log(`Using API URL: ${apiUrl}`);
-            
-            const response = await fetch(`${apiUrl}/calculate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestPayload),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
-                throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
-            }
-            const data: BackendResponse = await response.json();
-            console.log("API Response:", data); // Debug log
-            setResults(data);
-        } catch (err: any) {
-            setError(err.message || 'Failed to fetch results.');
-            console.error("Calculation error:", err);
-        } finally {
-            setIsLoading(false);
-        }
+        setScenarios([...scenarios, newScenario]);
     };
-
-    // Toggle function for expanding/collapsing detailed breakdown
-    const toggleDetailedBreakdown = (scenarioId: string, growthKey: string) => {
-        const key = `${scenarioId}-${growthKey}`;
-        setExpandedScenarios(prev => ({
-            ...prev,
-            [key]: !prev[key]
-        }));
-    };
-
-    const activeScenario = scenarios.find(sc => sc.id === activeTab);
-
-    const currencySymbol = scenarioSettings.currency === 'EUR' ? '€' : 'DKK';
-
-    // Define the order for result rows
-    const resultRowOrder: (keyof SingleScenarioResult['scenario_outcomes'])[] = ['zero_growth', 'average', 'low_risk', 'high_risk'];
     
-    // Function to format growth rate as percentage
+    // Update a scenario
+    const updateScenario = (id: string, updatedData: ScenarioInputsState) => {
+        setScenarios(scenarios.map(s => s.id === id ? updatedData : s));
+    };
+    
+    // Remove a scenario
+    const removeScenario = (id: string) => {
+        setScenarios(scenarios.filter(s => s.id !== id));
+    };
+    
+    // Toggle detailed breakdown visibility
+    const toggleDetailedBreakdown = (scenarioId: string, key: string) => {
+        const expandKey = `${scenarioId}-${key}`;
+        setExpandedScenarios({
+            ...expandedScenarios,
+            [expandKey]: !expandedScenarios[expandKey]
+        });
+    };
+    
+    // Format growth rate for display
     const formatGrowthRate = (rate: number): string => {
         return `${(rate * 100).toFixed(1)}%`;
     };
     
-    // Get growth rate labels with percentages
-    const getResultRowLabel = (key: keyof SingleScenarioResult['scenario_outcomes']): string => {
-        const baseLabel = resultRowLabels[key];
-        const growthRates = results?.growth_rates;
+    // Get result row label with growth rate
+    const getResultRowLabel = (key: string): string => {
+        const baseLabel = resultRowLabels[key as keyof SingleScenarioResult['scenario_outcomes']] || key;
         
-        if (!growthRates) return baseLabel;
+        // If no growth rates available, return base label
+        if (!results?.growth_rates) return baseLabel;
+        
+        const growthRates = results.growth_rates;
         
         // Map frontend keys to backend keys
-        const backendKeyMap: Record<string, string> = {
-            'average': 'avg_growth',
+        const backendKeyMap = {
             'zero_growth': 'zero_growth',
+            'average': 'avg_growth',
             'low_risk': 'low_risk',
             'high_risk': 'high_risk'
         };
@@ -1100,103 +982,203 @@ function App() {
             
             return result;
         } catch (error) {
-            console.error("Error mapping backend keys to frontend:", error);
-            return result; // Return original result if mapping fails
+            console.error("Error mapping backend keys:", error);
+            return result;
+        }
+    };
+    
+    // Define the order for result rows
+    const resultRowOrder = ['zero_growth', 'average', 'low_risk', 'high_risk'];
+    
+    // Handle calculation
+    const handleCalculate = async () => {
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+            // Prepare backend payload
+            const backendScenarios: BackendScenarioPayload[] = scenarios.map(scenario => {
+                // Convert renovations to backend format (remove client-side IDs)
+                const renovations: RenovationPayloadItem[] = scenario.renovations.map(({ id, ...rest }) => rest);
+                
+                return {
+                    id: scenario.id,
+                    country: scenario.country,
+                    city: scenario.city,
+                    inputs: {
+                        property_type: scenario.property_type,
+                        new_flat_price: scenario.new_flat_price,
+                        renovations,
+                        loan_details: scenario.loan_details,
+                        beckham_law_active: scenario.beckham_law_active,
+                        beckham_law_remaining_years: scenario.beckham_law_remaining_years,
+                        loan_type: scenario.loan_type,
+                        construction_completion_years: scenario.construction_completion_years,
+                        payment_schedule: scenario.payment_schedule
+                    }
+                };
+            });
+            
+            const payload: CalculationRequest = {
+                personal_finance: personalFinance,
+                scenario_settings: scenarioSettings,
+                scenarios: backendScenarios,
+                renting_scenario_inputs: rentingScenarioInputs.monthly_rent ? rentingScenarioInputs : undefined
+            };
+            
+            console.log("Sending calculation request:", payload);
+            
+            // Get API URL from config
+            const apiUrl = window.RUNTIME_CONFIG?.API_URL || 'http://localhost:5000/api';
+            
+            // Send request to backend
+            const response = await fetch(`${apiUrl}/calculate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log("Received calculation response:", data);
+            
+            setResults(data);
+        } catch (err) {
+            console.error("Calculation error:", err);
+            setError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
             <header className="mb-8 text-center">
-                <h1 className="text-4xl font-bold text-indigo-700">Property Investment Analyzer</h1>
-                <p className="text-md text-gray-600">Compare property investments across different scenarios and locations.</p>
+                <h1 className="text-4xl font-bold text-indigo-700 mb-2">Property Investment Analyzer</h1>
+                <p className="text-lg text-gray-600">Compare property investment scenarios across different countries and growth profiles.</p>
+                {appVersion && (
+                    <p className="text-sm text-gray-500 mt-2">Version {appVersion}</p>
+                )}
             </header>
 
-            {/* --- Global Settings & Personal Finance --- */}
-            <section className="mb-8 p-6 bg-white rounded-lg shadow-lg">
-                <h2 className="text-2xl font-semibold mb-4 text-gray-700 border-b pb-2">Global Settings</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <InputField
-                        label="Years to Sell"
-                        type="number"
-                        value={scenarioSettings.years_to_sell}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleScenarioSettingsChange('years_to_sell', e.target.value)}
-                        placeholder="e.g., 10"
-                        tooltip="Number of years you plan to hold the property before selling."
-                        min="1"
-                    />
-                    <SelectField
-                        label="Display Currency"
-                        value={scenarioSettings.currency}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleScenarioSettingsChange('currency', e.target.value)}
-                        options={[{ value: 'EUR', label: 'EUR (€)' }, { value: 'DKK', label: 'DKK (kr.)' }]}
-                        tooltip="Select the currency for displaying financial values."
-                    />
-                    <div> {/* Placeholder for potential third global setting */}
+            <div className="mb-8 p-6 bg-white rounded-lg shadow-md">
+                <h2 className="text-2xl font-semibold mb-4">Personal Finance</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <InputField
+                            label="Annual Salary"
+                            value={personalFinance.salary}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalFinance({...personalFinance, salary: parseFloat(e.target.value) || undefined})}
+                            placeholder="e.g., 100000"
+                            tooltip="Your annual gross salary."
+                        />
+                        <InputField
+                            label="Tax Rate Override (%)"
+                            value={personalFinance.tax_rate_override !== null ? personalFinance.tax_rate_override : ''}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const value = e.target.value === '' ? null : parseFloat(e.target.value) / 100;
+                                setPersonalFinance({...personalFinance, tax_rate_override: value});
+                            }}
+                            placeholder="e.g., 30"
+                            tooltip="Override the default tax rate calculation (optional)."
+                        />
+                    </div>
+                    <div>
+                        <InputField
+                            label="Existing Flat Value"
+                            value={personalFinance.existing_flat_value}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalFinance({...personalFinance, existing_flat_value: parseFloat(e.target.value) || undefined})}
+                            placeholder="e.g., 400000"
+                            tooltip="Value of your current property (if applicable)."
+                        />
+                        <InputField
+                            label="Existing Loan Size"
+                            value={personalFinance.existing_loan_size}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalFinance({...personalFinance, existing_loan_size: parseFloat(e.target.value) || undefined})}
+                            placeholder="e.g., 300000"
+                            tooltip="Outstanding balance on your current property loan (if applicable)."
+                        />
                     </div>
                 </div>
-                <h3 className="text-xl font-semibold mt-6 mb-4 text-gray-700 border-b pb-2">Personal Finance (Optional)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                     <InputField
-                        label={`Annual Gross Salary (${currencySymbol})`}
-                        value={personalFinance.salary}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handlePersonalFinanceChange('salary', e.target.value)}
-                        placeholder="e.g., 60000"
-                        tooltip="Your annual gross salary (used for some tax calculations if applicable)."
-                    />
-                    <InputField
-                        label="Tax Rate Override (%)"
-                        value={personalFinance.tax_rate_override !== undefined && personalFinance.tax_rate_override !== null ? personalFinance.tax_rate_override * 100 : ''}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handlePersonalFinanceChange('tax_rate_override', parseFloat(e.target.value) / 100)}
-                        placeholder="e.g., 30 for 30% (optional)"
-                        tooltip="Override default income tax calculations with a flat rate (e.g., 0.30 for 30%). Leave blank to use defaults."
-                        min="0"
-                        max="100"
-                    />
+            </div>
+
+            <div className="mb-8 p-6 bg-white rounded-lg shadow-md">
+                <h2 className="text-2xl font-semibold mb-4">Scenario Settings</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <InputField
+                            label="Years to Sell"
+                            value={scenarioSettings.years_to_sell}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScenarioSettings({...scenarioSettings, years_to_sell: parseInt(e.target.value, 10) || 5})}
+                            placeholder="e.g., 5"
+                            tooltip="Number of years before selling the property."
+                            min={1}
+                            max={50}
+                        />
+                    </div>
+                    <div>
+                        <SelectField
+                            label="Currency"
+                            value={scenarioSettings.currency}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setScenarioSettings({...scenarioSettings, currency: e.target.value as 'EUR' | 'DKK'})}
+                            options={[
+                                { value: 'EUR', label: 'Euro (€)' },
+                                { value: 'DKK', label: 'Danish Krone (kr)' },
+                            ]}
+                            tooltip="Currency for all calculations."
+                        />
+                    </div>
                 </div>
-            </section>
+            </div>
 
-            {/* --- Renting Scenario Input Section --- */}
-            <section className="mb-8">
-                <RentingScenarioInputSection 
-                    inputs={rentingInputs} 
-                    onChange={handleRentingInputChange} 
-                    currency={currencySymbol} 
+            <div className="mb-8">
+                <h2 className="text-2xl font-semibold mb-4">Renting Scenario</h2>
+                <RentingScenarioInputComponent
+                    inputs={rentingScenarioInputs}
+                    onChange={setRentingScenarioInputs}
                 />
-            </section>
+            </div>
 
-            {/* --- Purchase Scenarios Section --- */}
-            <section className="mb-8">
-                <h2 className="text-2xl font-semibold mb-4 text-gray-700 border-b pb-2">Purchase Scenarios</h2>
-                <div className="mb-4 flex items-center space-x-2 border-b border-gray-300">
-                    {scenarios.map(sc => (
-                        <button
-                            key={sc.id}
-                            onClick={() => setActiveTab(sc.id)}
-                            className={`py-2 px-4 text-sm font-medium focus:outline-none 
-                                        ${activeTab === sc.id 
-                                            ? 'border-b-2 border-indigo-500 text-indigo-600'
-                                            : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-                        >
-                            {sc.name}
-                        </button>
-                    ))}
-                    <button onClick={addScenario} className="ml-auto py-2 px-3 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-md flex items-center">
-                        + Add Scenario
+            <div className="mb-8">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-2xl font-semibold">Purchase Scenarios</h2>
+                    <button
+                        onClick={addScenario}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
+                    >
+                        Add Scenario
                     </button>
                 </div>
-
-                {activeScenario && (
-                    <ScenarioInput
-                        key={activeScenario.id} // Important for re-rendering when tab changes
-                        scenario={activeScenario}
-                        onChange={(updatedData) => updateScenario(activeScenario.id, updatedData)}
-                        onRemove={() => removeScenario(activeScenario.id)}
-                        currency={currencySymbol}
-                    />
+                
+                {scenarios.length === 0 && (
+                    <div className="text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-gray-600 mb-4">No scenarios added yet.</p>
+                        <button
+                            onClick={addScenario}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
+                        >
+                            Add Your First Scenario
+                        </button>
+                    </div>
                 )}
-                {scenarios.length === 0 && <p className="text-center text-gray-500 py-4">No purchase scenarios defined. Click "+ Add Scenario" to begin.</p>}
-            </section>
+                
+                <div className="space-y-6">
+                    {scenarios.map((scenario) => (
+                        <ScenarioInput
+                            key={scenario.id}
+                            scenario={scenario}
+                            onChange={(updatedData) => updateScenario(scenario.id, updatedData)}
+                            onRemove={() => removeScenario(scenario.id)}
+                            currency={currencySymbol}
+                        />
+                    ))}
+                </div>
+            </div>
 
             <div className="text-center my-10">
                 <button
@@ -1356,6 +1338,11 @@ function App() {
                     </details>
                 </section>
             )}
+            
+            <footer className="mt-12 pt-6 border-t border-gray-200 text-center text-gray-600 text-sm">
+                <p>Property Investment Analyzer v{appVersion || "4.0.0"}</p>
+                <p className="mt-1">© {new Date().getFullYear()} Property Analyzer Tool</p>
+            </footer>
         </div>
     );
 }

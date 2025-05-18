@@ -95,6 +95,12 @@ def calculate_investment():
             "global_warnings": list(warnings)
         }
         
+        # Add growth rates to the root response from the first valid scenario result
+        for scenario_result in results:
+            if scenario_result.get("result") and scenario_result["result"].get("growth_rates"):
+                final_response["growth_rates"] = scenario_result["result"]["growth_rates"]
+                break
+        
         if renting_results:
             final_response["renting_scenario_results"] = renting_results
 
