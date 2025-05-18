@@ -469,6 +469,9 @@ def perform_calculation_for_scenario(calculation_input):
         "high_risk": avg_appreciation_rate + std_dev
     }
     
+    # Debug log to ensure growth rates are defined
+    print(f"Growth rates for {country}/{city}: {growth_rates}")
+    
     # Calculate selling costs and capital gains tax for each scenario
     selling_scenarios = {}
     beckham_law_active = inputs.get("beckham_law_active", False)
