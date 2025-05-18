@@ -354,12 +354,9 @@ const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: S
         handleInputChange(parentField, updatedParent);
     };
     
+    // Remove unused function
     const handleRenovationChange = (renovations: RenovationItem[]) => {
         handleInputChange('renovations', renovations);
-    };
-    
-    const handlePaymentScheduleChange = (schedule: PaymentScheduleItem[]) => {
-        handleInputChange('payment_schedule', schedule);
     };
 
     return (
@@ -779,8 +776,13 @@ function App() {
     
     // Load app version from config
     useEffect(() => {
-        if (window.RUNTIME_CONFIG && window.RUNTIME_CONFIG.VERSION) {
-            setAppVersion(window.RUNTIME_CONFIG.VERSION);
+        try {
+            if (window && window.RUNTIME_CONFIG && window.RUNTIME_CONFIG.VERSION) {
+                setAppVersion(window.RUNTIME_CONFIG.VERSION);
+            }
+        } catch (error) {
+            console.error("Error loading app version:", error);
+            setAppVersion("4.0.2"); // Fallback version
         }
     }, []);
     
@@ -868,7 +870,8 @@ function App() {
     
     // Get result row label with growth rate
     const getResultRowLabel = (key: string): string => {
-        const baseLabel = resultRowLabels[key as keyof SingleScenarioResult['scenario_outcomes']] || key;
+        // Use type assertion to safely access resultRowLabels with string key
+        const baseLabel = (resultRowLabels as Record<string, string>)[key] || key;
         
         // If no growth rates available, return base label
         if (!results?.growth_rates) return baseLabel;
@@ -876,7 +879,7 @@ function App() {
         const growthRates = results.growth_rates;
         
         // Map frontend keys to backend keys
-        const backendKeyMap = {
+        const backendKeyMap: Record<string, string> = {
             'zero_growth': 'zero_growth',
             'average': 'avg_growth',
             'low_risk': 'low_risk',
