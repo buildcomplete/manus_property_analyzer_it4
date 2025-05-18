@@ -520,7 +520,7 @@ const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: S
                         {scenario.loan_details?.amount && scenario.loan_details?.interest_rate && scenario.loan_details?.term_years && (
                             <LoanPaybackScheduleComponent 
                                 loanDetails={scenario.loan_details} 
-                                currency={scenarioSettings.currency === 'EUR' ? '€' : 'kr'} 
+                                currency={currency} 
                             />
                         )}
                     </div>
@@ -797,7 +797,7 @@ function App() {
             }
         } catch (error) {
             console.error("Error loading app version:", error);
-            setAppVersion("4.0.2"); // Fallback version
+            setAppVersion("4.0.7"); // Fallback version
         }
     }, []);
     
@@ -835,7 +835,7 @@ function App() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     
-    // State for expanded detailed breakdowns
+    // State for expanded detailed breakdowns and active scenario tab
     const [expandedScenarios, setExpandedScenarios] = useState<Record<string, boolean>>({});
     
     // Currency symbol based on selected currency
@@ -856,7 +856,15 @@ function App() {
                 term_years: undefined
             }
         };
-        setScenarios([...scenarios, newScenario]);
+        const newScenarios = [...scenarios, newScenario];
+        setScenarios(newScenarios);
+        
+        // Set the newly added scenario as active in tabs
+        const newExpandedState = {};
+        newScenarios.forEach(s => {
+            newExpandedState[s.id] = s.id === newScenario.id;
+        });
+        setExpandedScenarios(newExpandedState);
     };
     
     // Update a scenario
@@ -866,7 +874,18 @@ function App() {
     
     // Remove a scenario
     const removeScenario = (id: string) => {
-        setScenarios(scenarios.filter(s => s.id !== id));
+        const remainingScenarios = scenarios.filter(s => s.id !== id);
+        setScenarios(remainingScenarios);
+        
+        // If we removed the active scenario, activate another one if available
+        if (expandedScenarios[id] && remainingScenarios.length > 0) {
+            const newExpandedState = {};
+            remainingScenarios.forEach((s, index) => {
+                // Activate the first scenario by default
+                newExpandedState[s.id] = index === 0;
+            });
+            setExpandedScenarios(newExpandedState);
+        }
     };
     
     // Toggle detailed breakdown visibility
@@ -1185,17 +1204,49 @@ function App() {
                     </div>
                 )}
                 
-                <div className="space-y-6">
-                    {scenarios.map((scenario) => (
-                        <ScenarioInput
-                            key={scenario.id}
-                            scenario={scenario}
-                            onChange={(updatedData) => updateScenario(scenario.id, updatedData)}
-                            onRemove={() => removeScenario(scenario.id)}
-                            currency={currencySymbol}
-                        />
-                    ))}
-                </div>
+                {scenarios.length > 0 && (
+                    <div className="mb-4">
+                        {/* Scenario Tabs Navigation */}
+                        <div className="flex overflow-x-auto border-b border-gray-200 mb-4">
+                            {scenarios.map((scenario, index) => (
+                                <button
+                                    key={scenario.id}
+                                    onClick={() => {
+                                        // Create a new object with all scenarios set to false
+                                        const newExpandedState = {};
+                                        // Then set the current scenario to true
+                                        scenarios.forEach(s => {
+                                            newExpandedState[s.id] = s.id === scenario.id;
+                                        });
+                                        setExpandedScenarios(newExpandedState);
+                                    }}
+                                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap ${
+                                        expandedScenarios[scenario.id] 
+                                            ? 'border-b-2 border-indigo-500 text-indigo-600' 
+                                            : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                                >
+                                    {scenario.name || `Scenario ${index + 1}`}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {/* Scenario Content */}
+                        {scenarios.map((scenario) => (
+                            <div 
+                                key={scenario.id} 
+                                className={expandedScenarios[scenario.id] ? 'block' : 'hidden'}
+                            >
+                                <ScenarioInput
+                                    scenario={scenario}
+                                    onChange={(updatedData) => updateScenario(scenario.id, updatedData)}
+                                    onRemove={() => removeScenario(scenario.id)}
+                                    currency={currencySymbol}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div className="text-center my-10">
