@@ -337,7 +337,8 @@ def calculate_selling_costs(country, city, selling_price, purchase_price, purcha
         costs["breakdown"]["plusvalia_municipal"] = plusvalia_municipal
         costs["total"] += plusvalia_municipal
     
-    return costs_gains = max(0, selling_price - purchase_costs_investment_total)
+    costs_gains = max(0, selling_price - purchase_costs_investment_total)
+    return costs_gains
     
     if country == "spain":
         # Plusvalia municipal (example calculation, actual formula is complex)
