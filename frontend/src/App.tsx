@@ -469,13 +469,28 @@ const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: S
                     <div className="mb-6 p-4 border rounded-md bg-gray-50">
                         <h4 className="font-medium mb-3 text-md">Loan Details</h4>
                         
-                        <InputField
-                            label={`Loan Amount (${currency})`}
-                            value={scenario.loan_details?.amount}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'amount', e.target.value)}
-                            placeholder="e.g., 400000"
-                            tooltip="The principal amount of the loan."
-                        />
+                        <div className="mb-4">
+                            <InputField
+                                label={`Loan Amount (${currency})`}
+                                value={scenario.loan_details?.amount}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNestedChange('loan_details', 'amount', e.target.value)}
+                                placeholder="e.g., 400000"
+                                tooltip="The principal amount of the loan."
+                            />
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (scenario.new_flat_price) {
+                                        const eightyPercentAmount = Math.round(scenario.new_flat_price * 0.8);
+                                        handleNestedChange('loan_details', 'amount', eightyPercentAmount);
+                                    }
+                                }}
+                                className="mt-1 text-sm bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-200 hover:bg-blue-100"
+                                disabled={!scenario.new_flat_price}
+                            >
+                                Set to 80% of property price
+                            </button>
+                        </div>
                         
                         <InputField
                             label="Interest Rate (%)"
@@ -505,7 +520,7 @@ const ScenarioInput = ({ scenario, onChange, onRemove, currency }: { scenario: S
                         {scenario.loan_details?.amount && scenario.loan_details?.interest_rate && scenario.loan_details?.term_years && (
                             <LoanPaybackScheduleComponent 
                                 loanDetails={scenario.loan_details} 
-                                currency={currency === 'EUR' ? '€' : 'kr'} 
+                                currency={scenarioSettings.currency === 'EUR' ? '€' : 'kr'} 
                             />
                         )}
                     </div>
