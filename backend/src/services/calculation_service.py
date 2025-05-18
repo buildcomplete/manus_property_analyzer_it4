@@ -337,34 +337,9 @@ def calculate_selling_costs(country, city, selling_price, purchase_price, purcha
         costs["breakdown"]["plusvalia_municipal"] = plusvalia_municipal
         costs["total"] += plusvalia_municipal
     
+    # Calculate costs_gains but don't return it prematurely
     costs_gains = max(0, selling_price - purchase_costs_investment_total)
-    return costs_gains
-    
-    if country == "spain":
-        # Plusvalia municipal (example calculation, actual formula is complex)
-        plusvalia = get_rate(country, city, "selling_plusvalia_municipal")
-        costs["breakdown"]["plusvalia_municipal"] = plusvalia
-        costs["total"] += plusvalia
-        
-        # Capital gains tax
-        if capital_gains > 0:
-            if beckham_law_active:
-                # Beckham Law - flat rate on capital gains
-                tax_rate = get_rate(country, city, "beckham_law_tax_rate")
-                capital_gains_tax = capital_gains * tax_rate
-            else:
-                # Progressive tax rates
-                rates_table = get_rate(country, city, "capital_gains_tax_rate_spain")
-                capital_gains_tax = calculate_progressive_tax(capital_gains, rates_table)
-            
-            costs["breakdown"]["capital_gains_tax"] = capital_gains_tax
-            costs["total"] += capital_gains_tax
-    
-    elif country == "denmark":
-        # No capital gains tax for Danish properties when tax resident in Denmark
-        # This assumes the user is tax resident in the same country as the property
-        costs["breakdown"]["capital_gains_tax"] = 0
-        costs["breakdown"]["note"] = "No capital gains tax applied (assumes tax residence in Denmark)"
+    costs["breakdown"]["costs_gains"] = costs_gains
     
     return costs
 
