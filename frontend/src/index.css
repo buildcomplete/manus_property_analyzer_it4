@@ -7,12 +7,13 @@
 
 @layer base {
   :root {
-    /* buildcomplete color palette */
+    /* buildcomplete color palette - improved contrast */
     --dark-blue: #0A1929;
     --electric-blue: #00B8FF;
     --bright-green: #00FF9D;
     --soft-purple: #9D00FF;
-    --off-white: #F2F2F2;
+    --off-white: #FFFFFF;
+    --light-gray: #E0E0E0;
     
     /* UI component variables */
     --radius: 0.5rem;
@@ -25,7 +26,7 @@
     --sidebar-border: var(--electric-blue);
     --sidebar-ring: var(--soft-purple);
     
-    /* Base colors */
+    /* Base colors - improved contrast */
     --background: var(--dark-blue);
     --foreground: var(--off-white);
     --card: var(--dark-blue);
@@ -40,21 +41,45 @@
     --accent-foreground: var(--off-white);
     --destructive: #ff4d4f;
     --destructive-foreground: var(--off-white);
-    --muted: rgba(242, 242, 242, 0.1);
-    --muted-foreground: rgba(242, 242, 242, 0.5);
+    --muted: rgba(255, 255, 255, 0.2);
+    --muted-foreground: rgba(255, 255, 255, 0.85);
     --border: var(--electric-blue);
     --input: var(--electric-blue);
     --ring: var(--electric-blue);
+    
+    /* Form and label colors - high contrast */
+    --label-color: var(--off-white);
+    --input-text: var(--off-white);
+    --input-placeholder: var(--light-gray);
+    --input-background: rgba(0, 0, 0, 0.2);
   }
   
   body {
     font-family: 'JetBrains Mono', monospace;
     background-color: var(--background);
     color: var(--foreground);
+    font-weight: 400;
   }
   
   h1, h2, h3, h4, h5, h6 {
     font-family: 'JetBrains Mono', monospace;
+    color: var(--off-white);
+    font-weight: 700;
+  }
+  
+  label, .label {
+    color: var(--label-color);
+    font-weight: 500;
+  }
+  
+  input, select, textarea {
+    background-color: var(--input-background);
+    color: var(--input-text);
+    border: 1px solid var(--border);
+  }
+  
+  input::placeholder, textarea::placeholder {
+    color: var(--input-placeholder);
   }
   
   .brand-name {
@@ -73,10 +98,11 @@
   .terminal-box {
     border: 1px solid var(--electric-blue);
     border-radius: 4px;
-    background-color: var(--dark-blue);
+    background-color: rgba(0, 0, 0, 0.3);
     padding: 1rem;
     font-family: 'JetBrains Mono', monospace;
     position: relative;
+    box-shadow: 0 0 10px rgba(0, 184, 255, 0.2);
   }
   
   .terminal-box::before {
@@ -87,6 +113,17 @@
     background-color: var(--dark-blue);
     padding: 0 8px;
     color: var(--electric-blue);
+    font-weight: bold;
+  }
+  
+  /* Improve form labels and info icons */
+  .info-icon {
+    color: var(--electric-blue);
+  }
+  
+  /* Improve text contrast for all UI elements */
+  .text-muted-foreground {
+    color: var(--light-gray) !important;
   }
 }
 
