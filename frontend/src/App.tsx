@@ -860,7 +860,7 @@ function App() {
         setScenarios(newScenarios);
         
         // Set the newly added scenario as active in tabs
-        const newExpandedState = {};
+        const newExpandedState: Record<string, boolean> = {};
         newScenarios.forEach(s => {
             newExpandedState[s.id] = s.id === newScenario.id;
         });
@@ -879,7 +879,7 @@ function App() {
         
         // If we removed the active scenario, activate another one if available
         if (expandedScenarios[id] && remainingScenarios.length > 0) {
-            const newExpandedState = {};
+            const newExpandedState: Record<string, boolean> = {};
             remainingScenarios.forEach((s, index) => {
                 // Activate the first scenario by default
                 newExpandedState[s.id] = index === 0;
@@ -1096,15 +1096,20 @@ function App() {
     return (
         <div className="container mx-auto px-4 py-8 max-w-7xl">
             <header className="mb-8 text-center">
-                <h1 className="text-4xl font-bold text-indigo-700 mb-2">Property Investment Analyzer</h1>
-                <p className="text-lg text-gray-600">Compare property investment scenarios across different countries and growth profiles.</p>
+                <h1 className="text-4xl font-bold text-primary mb-2">
+                    <span className="brand-name">
+                        <span className="regular">build</span><span className="bold">complete</span>
+                    </span> Property Investment Analyzer
+                </h1>
+                <p className="text-lg text-foreground mb-2">Compare property investment scenarios across different countries and growth profiles.</p>
+                <p className="text-sm text-muted-foreground">Building the future, one line at a time.</p>
                 {appVersion && (
-                    <p className="text-sm text-gray-500 mt-2">Version {appVersion}</p>
+                    <p className="text-sm text-primary mt-2">Version {appVersion}</p>
                 )}
             </header>
 
-            <div className="mb-8 p-6 bg-white rounded-lg shadow-md">
-                <h2 className="text-2xl font-semibold mb-4">Personal Finance</h2>
+            <div className="mb-8 p-6 terminal-box rounded-lg">
+                <h2 className="text-2xl font-semibold mb-4 text-primary">Personal Finance</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <InputField
@@ -1144,8 +1149,8 @@ function App() {
                 </div>
             </div>
 
-            <div className="mb-8 p-6 bg-white rounded-lg shadow-md">
-                <h2 className="text-2xl font-semibold mb-4">Scenario Settings</h2>
+            <div className="mb-8 p-6 terminal-box rounded-lg">
+                <h2 className="text-2xl font-semibold mb-4 text-primary">Scenario Settings</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <InputField
@@ -1174,30 +1179,32 @@ function App() {
             </div>
 
             <div className="mb-8">
-                <h2 className="text-2xl font-semibold mb-4">Renting Scenario</h2>
+                <h2 className="text-2xl font-semibold mb-4 text-primary">Renting Scenario</h2>
+                <div className="terminal-box p-6 rounded-lg">
                 <RentingScenarioInputComponent
                     inputs={rentingScenarioInputs}
                     onChange={setRentingScenarioInputs}
                 />
+                </div>
             </div>
 
             <div className="mb-8">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-semibold">Purchase Scenarios</h2>
+                    <h2 className="text-2xl font-semibold text-primary">Purchase Scenarios</h2>
                     <button
                         onClick={addScenario}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-opacity-80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50"
                     >
                         Add Scenario
                     </button>
                 </div>
                 
                 {scenarios.length === 0 && (
-                    <div className="text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
-                        <p className="text-gray-600 mb-4">No scenarios added yet.</p>
+                    <div className="text-center p-8 terminal-box rounded-lg">
+                        <p className="text-foreground mb-4">No scenarios added yet.</p>
                         <button
                             onClick={addScenario}
-                            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
+                            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-opacity-80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50"
                         >
                             Add Your First Scenario
                         </button>
@@ -1207,13 +1214,13 @@ function App() {
                 {scenarios.length > 0 && (
                     <div className="mb-4">
                         {/* Scenario Tabs Navigation */}
-                        <div className="flex overflow-x-auto border-b border-gray-200 mb-4">
+                        <div className="flex overflow-x-auto border-b border-primary mb-4">
                             {scenarios.map((scenario, index) => (
                                 <button
                                     key={scenario.id}
                                     onClick={() => {
                                         // Create a new object with all scenarios set to false
-                                        const newExpandedState = {};
+                                        const newExpandedState: Record<string, boolean> = {};
                                         // Then set the current scenario to true
                                         scenarios.forEach(s => {
                                             newExpandedState[s.id] = s.id === scenario.id;
@@ -1222,8 +1229,8 @@ function App() {
                                     }}
                                     className={`px-4 py-2 text-sm font-medium whitespace-nowrap ${
                                         expandedScenarios[scenario.id] 
-                                            ? 'border-b-2 border-indigo-500 text-indigo-600' 
-                                            : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            ? 'border-b-2 border-secondary text-secondary' 
+                                            : 'text-muted-foreground hover:text-foreground hover:border-muted'
                                     }`}
                                 >
                                     {scenario.name || `Scenario ${index + 1}`}
@@ -1235,7 +1242,7 @@ function App() {
                         {scenarios.map((scenario) => (
                             <div 
                                 key={scenario.id} 
-                                className={expandedScenarios[scenario.id] ? 'block' : 'hidden'}
+                                className={expandedScenarios[scenario.id] ? 'block terminal-box p-6 rounded-lg' : 'hidden'}
                             >
                                 <ScenarioInput
                                     scenario={scenario}

@@ -30,8 +30,8 @@ DEFAULT_RATES = {
             ],
             "beckham_law_tax_rate": 0.24, # Flat rate up to 600k EUR income
             "standard_income_tax_rate": 0.35, # Placeholder progressive rate
-            "avg_appreciation_rate": 0.03,
-            "appreciation_std_dev": 0.05,
+            "avg_appreciation_rate": 0.05, # Updated based on Spain property data (5% annual growth)
+            "appreciation_std_dev": 0.02, # Standard deviation for growth scenarios
             "renovation_rates": {
                 "kitchen": 15000,
                 "bathroom": 8000,

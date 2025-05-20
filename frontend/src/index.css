@@ -1,27 +1,92 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* buildcomplete branding v1.3 */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
 @layer base {
   :root {
-    --radius: 0.5rem
-  ;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%}
-  .dark {
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%
+    /* buildcomplete color palette */
+    --dark-blue: #0A1929;
+    --electric-blue: #00B8FF;
+    --bright-green: #00FF9D;
+    --soft-purple: #9D00FF;
+    --off-white: #F2F2F2;
+    
+    /* UI component variables */
+    --radius: 0.5rem;
+    --sidebar-background: var(--dark-blue);
+    --sidebar-foreground: var(--off-white);
+    --sidebar-primary: var(--electric-blue);
+    --sidebar-primary-foreground: var(--dark-blue);
+    --sidebar-accent: var(--bright-green);
+    --sidebar-accent-foreground: var(--dark-blue);
+    --sidebar-border: var(--electric-blue);
+    --sidebar-ring: var(--soft-purple);
+    
+    /* Base colors */
+    --background: var(--dark-blue);
+    --foreground: var(--off-white);
+    --card: var(--dark-blue);
+    --card-foreground: var(--off-white);
+    --popover: var(--dark-blue);
+    --popover-foreground: var(--off-white);
+    --primary: var(--electric-blue);
+    --primary-foreground: var(--dark-blue);
+    --secondary: var(--bright-green);
+    --secondary-foreground: var(--dark-blue);
+    --accent: var(--soft-purple);
+    --accent-foreground: var(--off-white);
+    --destructive: #ff4d4f;
+    --destructive-foreground: var(--off-white);
+    --muted: rgba(242, 242, 242, 0.1);
+    --muted-foreground: rgba(242, 242, 242, 0.5);
+    --border: var(--electric-blue);
+    --input: var(--electric-blue);
+    --ring: var(--electric-blue);
+  }
+  
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  .brand-name {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  .brand-name .regular {
+    font-weight: 400;
+  }
+  
+  .brand-name .bold {
+    font-weight: 700;
+  }
+  
+  /* Terminal-style elements */
+  .terminal-box {
+    border: 1px solid var(--electric-blue);
+    border-radius: 4px;
+    background-color: var(--dark-blue);
+    padding: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    position: relative;
+  }
+  
+  .terminal-box::before {
+    content: ">_";
+    position: absolute;
+    top: -12px;
+    left: 10px;
+    background-color: var(--dark-blue);
+    padding: 0 8px;
+    color: var(--electric-blue);
   }
 }
 
