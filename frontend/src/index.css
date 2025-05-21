@@ -13,9 +13,8 @@
     --bright-green: #00FF9D;
     --soft-purple: #9D00FF;
     --off-white: #FFFFFF;
-    --light-gray: #E0E0E0;
     
-    /* UI component variables */
+    /* UI component variables - strictly buildcomplete colors */
     --radius: 0.5rem;
     --sidebar-background: var(--dark-blue);
     --sidebar-foreground: var(--off-white);
@@ -26,7 +25,7 @@
     --sidebar-border: var(--electric-blue);
     --sidebar-ring: var(--soft-purple);
     
-    /* Base colors - improved contrast */
+    /* Base colors - strictly buildcomplete palette */
     --background: var(--dark-blue);
     --foreground: var(--off-white);
     --card: var(--dark-blue);
@@ -39,19 +38,19 @@
     --secondary-foreground: var(--dark-blue);
     --accent: var(--soft-purple);
     --accent-foreground: var(--off-white);
-    --destructive: #ff4d4f;
+    --destructive: var(--soft-purple);
     --destructive-foreground: var(--off-white);
-    --muted: rgba(255, 255, 255, 0.2);
-    --muted-foreground: rgba(255, 255, 255, 0.85);
+    --muted: rgba(0, 184, 255, 0.3);
+    --muted-foreground: var(--off-white);
     --border: var(--electric-blue);
     --input: var(--electric-blue);
     --ring: var(--electric-blue);
     
-    /* Form and label colors - high contrast */
-    --label-color: var(--off-white);
-    --input-text: var(--off-white);
-    --input-placeholder: var(--light-gray);
-    --input-background: rgba(0, 0, 0, 0.2);
+    /* Form and label colors - high contrast with buildcomplete palette */
+    --label-color: var(--electric-blue);
+    --input-text: var(--dark-blue);
+    --input-placeholder: var(--dark-blue);
+    --input-background: var(--off-white);
   }
   
   body {
@@ -69,17 +68,20 @@
   
   label, .label {
     color: var(--label-color);
-    font-weight: 500;
+    font-weight: 700;
+    text-shadow: 0 0 2px var(--dark-blue);
   }
   
   input, select, textarea {
     background-color: var(--input-background);
     color: var(--input-text);
-    border: 1px solid var(--border);
+    border: 2px solid var(--electric-blue);
+    font-weight: 500;
   }
   
   input::placeholder, textarea::placeholder {
-    color: var(--input-placeholder);
+    color: rgba(10, 25, 41, 0.7);
+    font-weight: 400;
   }
   
   .brand-name {
@@ -102,7 +104,7 @@
     padding: 1rem;
     font-family: 'JetBrains Mono', monospace;
     position: relative;
-    box-shadow: 0 0 10px rgba(0, 184, 255, 0.2);
+    box-shadow: 0 0 10px rgba(0, 184, 255, 0.3);
   }
   
   .terminal-box::before {
@@ -118,12 +120,36 @@
   
   /* Improve form labels and info icons */
   .info-icon {
-    color: var(--electric-blue);
+    color: var(--bright-green);
   }
   
   /* Improve text contrast for all UI elements */
   .text-muted-foreground {
-    color: var(--light-gray) !important;
+    color: var(--electric-blue) !important;
+  }
+  
+  /* Override any non-buildcomplete colors in Tailwind classes */
+  .bg-white, .bg-gray-50, .bg-gray-100, .bg-gray-200 {
+    background-color: var(--dark-blue) !important;
+  }
+  
+  .text-gray-500, .text-gray-600, .text-gray-700 {
+    color: var(--electric-blue) !important;
+  }
+  
+  .text-indigo-500, .text-indigo-600, .text-indigo-700 {
+    color: var(--electric-blue) !important;
+  }
+  
+  .border-gray-200, .border-gray-300 {
+    border-color: var(--electric-blue) !important;
+  }
+  
+  /* Form field specific overrides for better contrast */
+  .form-input, .form-select, .form-textarea {
+    background-color: var(--off-white);
+    color: var(--dark-blue);
+    border-color: var(--electric-blue);
   }
 }
 
