@@ -131,59 +131,42 @@
   }
   
   /* Override any non-buildcomplete colors in Tailwind classes */
-  .bg-white, .bg-gray-50, .bg-gray-100, .bg-gray-200 {
+  .bg-white, 
+  .bg-gray-50, 
+  .bg-gray-100, 
+  .bg-gray-200,
+  [class*="bg-white"],
+  [class*="bg-gray-"] {
     background-color: var(--dark-blue) !important;
+    color: var(--off-white) !important;
   }
   
-  .text-gray-500, .text-gray-600, .text-gray-700 {
-    color: var(--bright-green) !important;
+  /* Special case for form inputs and selects that should remain light */
+  input,
+  select,
+  textarea,
+  .form-input,
+  .form-select,
+  .form-textarea {
+    background-color: var(--off-white) !important;
+    color: var(--dark-blue) !important;
   }
   
-  .text-indigo-500, .text-indigo-600, .text-indigo-700 {
-    color: var(--electric-blue) !important;
+  /* Add specific component overrides */
+  .terminal-box,
+  .scenario-content,
+  .results-section,
+  section,
+  .detailed-breakdown {
+    background-color: var(--dark-blue) !important;
+    color: var(--off-white) !important;
   }
   
-  .border-gray-200, .border-gray-300 {
-    border-color: var(--electric-blue) !important;
-  }
-  
-  /* Form field specific overrides for better contrast */
-  .form-input, .form-select, .form-textarea {
-    background-color: var(--off-white);
-    color: var(--dark-blue);
-    border-color: var(--electric-blue);
-  }
-  
-  /* Targeted fixes for selectors */
-  select, .select, [role="combobox"] {
-    background-color: var(--off-white);
-    color: var(--dark-blue);
-    border: 2px solid var(--bright-green);
-    font-weight: 600;
-  }
-  
-  /* Fix for selector labels */
-  label[for="country"], 
-  label[for="city"], 
-  label[for="propertyType"], 
-  label[for="currency"],
-  div:has(> select) > label,
-  div:has(> [role="combobox"]) > label {
-    color: var(--bright-green);
-    font-weight: 700;
-    font-size: 1.1rem;
-    text-shadow: 0 0 3px var(--dark-blue);
-  }
-  
-  /* Fix for table columns with low contrast */
-  th, td {
-    color: var(--off-white);
-    font-weight: 500;
-  }
-  
-  th {
-    color: var(--bright-green);
-    font-weight: 700;
+  /* Override any white backgrounds in nested elements */
+  [class*="bg-white"] *:not(input):not(select):not(textarea),
+  [class*="bg-gray-"] *:not(input):not(select):not(textarea) {
+    background-color: inherit;
+    color: inherit;
   }
   
   /* Payment column specific fix */
@@ -237,6 +220,64 @@
   tbody td, tbody th {
     color: var(--off-white);
     border-bottom: 1px solid rgba(0, 184, 255, 0.3);
+  }
+  
+  /* Color utility overrides */
+  .text-red-500,
+  .text-red-600,
+  .text-red-700 {
+    color: rgb(239, 68, 68) !important; /* tailwind red-500 */
+  }
+
+  .text-green-500,
+  .text-green-600,
+  .text-green,
+  .text-green-700 {
+    color: rgb(34, 197, 94) !important; /* tailwind green-500 */
+  }
+
+  /* Table styles refinement */
+  table {
+    color: rgba(255, 255, 255, 0.9); /* slightly faded white for general text */
+  }
+
+  /* Reset specific column styles */
+  td, th {
+    color: rgba(255, 255, 255, 0.9); /* default color for all cells */
+  }
+
+  /* Keep accent colors only for specific important columns */
+  /* Payment column */
+  td:first-child:has(span.currency), 
+  th:first-child:has(span.currency) {
+    color: var(--electric-blue);
+    font-weight: 700;
+  }
+
+  /* Est. Selling Value and other monetary values */
+  td:has(span.currency), 
+  th:has(.currency) {
+    color: var(--bright-green);
+    font-weight: 600;
+  }
+
+  /* Headers should be clear but not overpowering */
+  thead th, thead td {
+    color: rgba(255, 255, 255, 1); /* full white for headers */
+    font-weight: 700;
+    border-bottom: 2px solid var(--electric-blue);
+  }
+
+  /* Table cell borders more subtle */
+  tbody td, tbody th {
+    border-bottom: 1px solid rgba(0, 184, 255, 0.2);
+  }
+
+  /* Override any bright green text that comes from utility classes */
+  [class*="text-gray"], 
+  [class*="text-slate"],
+  [class*="text-neutral"] {
+    color: rgba(255, 255, 255, 0.9) !important;
   }
 }
 
