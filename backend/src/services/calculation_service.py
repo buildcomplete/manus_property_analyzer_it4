@@ -55,7 +55,7 @@ DEFAULT_RATES = {
             "selling_agency_fee_rate": 0.02, # Example rate
             "capital_gains_tax_rate_denmark": 0.42, # Example max rate, complex rules, often 0 for primary residence after time
             "standard_income_tax_rate": 0.45, # Placeholder progressive rate
-            "avg_appreciation_rate": 0.04,
+            "avg_appreciation_rate": 0.035, # Updated based on Denmark property data (3.5% annual growth)
             "appreciation_std_dev": 0.06,
             "renovation_rates": {
                 "kitchen": 100000, # DKK

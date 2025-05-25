@@ -797,7 +797,7 @@ function App() {
             }
         } catch (error) {
             console.error("Error loading app version:", error);
-            setAppVersion("4.0.7"); // Fallback version
+            setAppVersion("4.2.0"); // Fallback version
         }
     }, []);
     

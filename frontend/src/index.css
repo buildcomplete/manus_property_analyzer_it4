@@ -2,9 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* buildcomplete branding v1.3 */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
-
 @layer base {
   :root {
     /* buildcomplete color palette - improved contrast */
@@ -52,232 +49,234 @@
     --input-placeholder: var(--dark-blue);
     --input-background: var(--off-white);
   }
-  
-  body {
-    font-family: 'JetBrains Mono', monospace;
-    background-color: var(--background);
-    color: var(--foreground);
-    font-weight: 400;
-  }
-  
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--off-white);
-    font-weight: 700;
-  }
-  
-  label, .label {
-    color: var(--label-color);
-    font-weight: 700;
-    text-shadow: 0 0 2px var(--dark-blue);
-    font-size: 1.05rem;
-  }
-  
-  input, select, textarea {
-    background-color: var(--input-background);
-    color: var(--input-text);
-    border: 2px solid var(--electric-blue);
-    font-weight: 500;
-  }
-  
-  input::placeholder, textarea::placeholder {
-    color: rgba(10, 25, 41, 0.7);
-    font-weight: 400;
-  }
-  
-  .brand-name {
-    font-family: 'JetBrains Mono', monospace;
-  }
-  
-  .brand-name .regular {
-    font-weight: 400;
-  }
-  
-  .brand-name .bold {
-    font-weight: 700;
-  }
-  
-  /* Terminal-style elements */
-  .terminal-box {
-    border: 1px solid var(--electric-blue);
-    border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.3);
-    padding: 1rem;
-    font-family: 'JetBrains Mono', monospace;
-    position: relative;
-    box-shadow: 0 0 10px rgba(0, 184, 255, 0.3);
-  }
-  
-  .terminal-box::before {
-    content: ">_";
-    position: absolute;
-    top: -12px;
-    left: 10px;
-    background-color: var(--dark-blue);
-    padding: 0 8px;
-    color: var(--electric-blue);
-    font-weight: bold;
-  }
-  
-  /* Improve form labels and info icons */
-  .info-icon {
-    color: var(--bright-green);
-    font-size: 1.2rem;
-  }
-  
-  /* Improve text contrast for all UI elements */
-  .text-muted-foreground {
-    color: var(--bright-green) !important;
-  }
-  
-  /* Override any non-buildcomplete colors in Tailwind classes */
-  .bg-white, 
-  .bg-gray-50, 
-  .bg-gray-100, 
-  .bg-gray-200,
-  [class*="bg-white"],
-  [class*="bg-gray-"] {
-    background-color: var(--dark-blue) !important;
-    color: var(--off-white) !important;
-  }
-  
-  /* Special case for form inputs and selects that should remain light */
-  input,
-  select,
-  textarea,
-  .form-input,
-  .form-select,
-  .form-textarea {
-    background-color: var(--off-white) !important;
-    color: var(--dark-blue) !important;
-  }
-  
-  /* Add specific component overrides */
-  .terminal-box,
-  .scenario-content,
-  .results-section,
-  section,
-  .detailed-breakdown {
-    background-color: var(--dark-blue) !important;
-    color: var(--off-white) !important;
-  }
-  
-  /* Override any white backgrounds in nested elements */
-  [class*="bg-white"] *:not(input):not(select):not(textarea),
-  [class*="bg-gray-"] *:not(input):not(select):not(textarea) {
-    background-color: inherit;
-    color: inherit;
-  }
-  
-  /* Payment column specific fix */
-  td:first-child, 
-  th:first-child {
-    color: var(--electric-blue);
-    font-weight: 700;
-  }
-  
-  /* Est. Selling Value column fix */
-  th:contains("Est. Selling Value"), 
-  td:nth-child(4) {
-    color: var(--bright-green);
-    font-weight: 600;
-  }
-  
-  /* Fix for calculation result headings with white background */
-  .bg-white h1, .bg-white h2, .bg-white h3, 
-  .bg-white h4, .bg-white h5, .bg-white h6 {
-    color: var(--dark-blue);
-    background-color: var(--off-white);
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    border-left: 4px solid var(--electric-blue);
-  }
-  
-  /* Deep dive section text fixes */
-  .deep-dive-section h3, 
-  .deep-dive-section h4,
-  div:contains("Purchase Costs") {
-    color: var(--bright-green);
-    font-weight: 700;
-    text-shadow: 0 0 2px var(--dark-blue);
-  }
-  
-  /* Additional fixes for any remaining low contrast elements */
-  [class*="text-gray"], 
-  [class*="text-slate"],
-  [class*="text-neutral"] {
-    color: var(--bright-green) !important;
-  }
-  
-  /* Ensure all table headers have good contrast */
-  thead th, thead td {
-    color: var(--bright-green);
-    font-weight: 700;
-    border-bottom: 2px solid var(--electric-blue);
-  }
-  
-  /* Ensure all table cells have good contrast */
-  tbody td, tbody th {
-    color: var(--off-white);
-    border-bottom: 1px solid rgba(0, 184, 255, 0.3);
-  }
-  
-  /* Color utility overrides */
-  .text-red-500,
-  .text-red-600,
-  .text-red-700 {
-    color: rgb(239, 68, 68) !important; /* tailwind red-500 */
-  }
-
-  .text-green-500,
-  .text-green-600,
-  .text-green,
-  .text-green-700 {
-    color: rgb(34, 197, 94) !important; /* tailwind green-500 */
-  }
-
-  /* Table styles refinement */
-  table {
-    color: rgba(255, 255, 255, 0.9); /* slightly faded white for general text */
-  }
-
-  /* Reset specific column styles */
-  td, th {
-    color: rgba(255, 255, 255, 0.9); /* default color for all cells */
-  }
-
-  /* Keep accent colors only for specific important columns */
-  /* Payment column */
-  td:first-child:has(span.currency), 
-  th:first-child:has(span.currency) {
-    color: var(--electric-blue);
-    font-weight: 700;
-  }
-
-  /* Est. Selling Value and other monetary values */
-  td:has(span.currency), 
-  th:has(.currency) {
-    color: var(--bright-green);
-    font-weight: 600;
-  }
-
-  /* Headers should be clear but not overpowering */
-  thead th, thead td {
-    color: rgba(255, 255, 255, 1); /* full white for headers */
-    font-weight: 700;
-    border-bottom: 2px solid var(--electric-blue);
-  }
-
-  /* Table cell borders more subtle */
-  tbody td, tbody th {
-    border-bottom: 1px solid rgba(0, 184, 255, 0.2);
-  }
-
-  /* Override any bright green text that comes from utility classes */
-  [class*="text-gray"], 
-  [class*="text-slate"],
-  [class*="text-neutral"] {
-    color: rgba(255, 255, 255, 0.9) !important;
-  }
 }
 
+/* buildcomplete branding v1.3 */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+  
+body {
+  font-family: 'JetBrains Mono', monospace;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-weight: 400;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--off-white);
+  font-weight: 700;
+}
+
+label, .label {
+  color: var(--label-color);
+  font-weight: 700;
+  text-shadow: 0 0 2px var(--dark-blue);
+  font-size: 1.05rem;
+}
+
+input, select, textarea {
+  background-color: var(--input-background);
+  color: var(--input-text);
+  border: 2px solid var(--electric-blue);
+  font-weight: 500;
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgba(10, 25, 41, 0.7);
+  font-weight: 400;
+}
+
+.brand-name {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.brand-name .regular {
+  font-weight: 400;
+}
+
+.brand-name .bold {
+  font-weight: 700;
+}
+
+/* Terminal-style elements */
+.terminal-box {
+  border: 1px solid var(--electric-blue);
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  position: relative;
+  box-shadow: 0 0 10px rgba(0, 184, 255, 0.3);
+}
+
+.terminal-box::before {
+  content: ">_";
+  position: absolute;
+  top: -12px;
+  left: 10px;
+  background-color: var(--dark-blue);
+  padding: 0 8px;
+  color: var(--electric-blue);
+  font-weight: bold;
+}
+
+/* Improve form labels and info icons */
+.info-icon {
+  color: var(--bright-green);
+  font-size: 1.2rem;
+}
+
+/* Improve text contrast for all UI elements */
+.text-muted-foreground {
+  color: var(--bright-green) !important;
+}
+
+/* Override any non-buildcomplete colors in Tailwind classes */
+.bg-white, 
+.bg-gray-50, 
+.bg-gray-100, 
+.bg-gray-200,
+[class*="bg-white"],
+[class*="bg-gray-"] {
+  background-color: var(--dark-blue) !important;
+  color: var(--off-white) !important;
+}
+
+/* Special case for form inputs and selects that should remain light */
+input,
+select,
+textarea,
+.form-input,
+.form-select,
+.form-textarea {
+  background-color: var(--off-white) !important;
+  color: var(--dark-blue) !important;
+}
+
+/* Add specific component overrides */
+.terminal-box,
+.scenario-content,
+.results-section,
+section,
+.detailed-breakdown {
+  background-color: var(--dark-blue) !important;
+  color: var(--off-white) !important;
+}
+
+/* Override any white backgrounds in nested elements */
+[class*="bg-white"] *:not(input):not(select):not(textarea),
+[class*="bg-gray-"] *:not(input):not(select):not(textarea) {
+  background-color: inherit;
+  color: inherit;
+}
+
+/* Payment column specific fix */
+td:first-child, 
+th:first-child {
+  color: var(--electric-blue);
+  font-weight: 700;
+}
+
+/* Est. Selling Value column fix */
+th:contains("Est. Selling Value"), 
+td:nth-child(4) {
+  color: var(--bright-green);
+  font-weight: 600;
+}
+
+/* Fix for calculation result headings with white background */
+.bg-white h1, .bg-white h2, .bg-white h3, 
+.bg-white h4, .bg-white h5, .bg-white h6 {
+  color: var(--dark-blue);
+  background-color: var(--off-white);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border-left: 4px solid var(--electric-blue);
+}
+
+/* Deep dive section text fixes */
+.deep-dive-section h3, 
+.deep-dive-section h4,
+div:contains("Purchase Costs") {
+  color: var(--bright-green);
+  font-weight: 700;
+  text-shadow: 0 0 2px var(--dark-blue);
+}
+
+/* Additional fixes for any remaining low contrast elements */
+[class*="text-gray"], 
+[class*="text-slate"],
+[class*="text-neutral"] {
+  color: var(--bright-green) !important;
+}
+
+/* Ensure all table headers have good contrast */
+thead th, thead td {
+  color: var(--bright-green);
+  font-weight: 700;
+  border-bottom: 2px solid var(--electric-blue);
+}
+
+/* Ensure all table cells have good contrast */
+tbody td, tbody th {
+  color: var(--off-white);
+  border-bottom: 1px solid rgba(0, 184, 255, 0.3);
+}
+
+/* Color utility overrides */
+.text-red-500,
+.text-red-600,
+.text-red-700 {
+  color: rgb(239, 68, 68) !important; /* tailwind red-500 */
+}
+
+.text-green-500,
+.text-green-600,
+.text-green,
+.text-green-700 {
+  color: rgb(34, 197, 94) !important; /* tailwind green-500 */
+}
+
+/* Table styles refinement */
+table {
+  color: rgba(255, 255, 255, 0.9); /* slightly faded white for general text */
+}
+
+/* Reset specific column styles */
+td, th {
+  color: rgba(255, 255, 255, 0.9); /* default color for all cells */
+}
+
+/* Keep accent colors only for specific important columns */
+/* Payment column */
+td:first-child:has(span.currency), 
+th:first-child:has(span.currency) {
+  color: var(--electric-blue);
+  font-weight: 700;
+}
+
+/* Est. Selling Value and other monetary values */
+td:has(span.currency), 
+th:has(.currency) {
+  color: var(--bright-green);
+  font-weight: 600;
+}
+
+/* Headers should be clear but not overpowering */
+thead th, thead td {
+  color: rgba(255, 255, 255, 1); /* full white for headers */
+  font-weight: 700;
+  border-bottom: 2px solid var(--electric-blue);
+}
+
+/* Table cell borders more subtle */
+tbody td, tbody th {
+  border-bottom: 1px solid rgba(0, 184, 255, 0.2);
+}
+
+/* Override any bright green text that comes from utility classes */
+[class*="text-gray"], 
+[class*="text-slate"],
+[class*="text-neutral"] {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
